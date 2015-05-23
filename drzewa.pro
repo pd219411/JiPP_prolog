@@ -10,8 +10,8 @@ user:runtime_entry(start):-
 	w_1(nonterminals_wrapped, ex1),
 	w_1(results, ex1),
 	w_1(first_map_keys, ex1),
-	w_1(first_map, ex1).
-	% w_1(expand_test, ex1).
+	w_1(first_map, ex1),
+	w_1(expand_test, ex1).
 
 write_grammar(N) :- grammar(N, G), write(G), write('\n').
 w_1(Predicate, Name) :- grammar(Name, Grammar), call(Predicate, Grammar, X), write(Predicate), write(' : '), write(X), write('\n').
@@ -24,7 +24,7 @@ grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], 
 % normalized(Grammar, NormalizedGrammar).
 normalized([], []).
 normalized([prod(E, [])|GrammarRest], NormalizedGrammar) :- normalized(GrammarRest, NormalizedGrammar).
-normalized([prod(E, [Result|ResultsRest])|GrammarRest], [prod_1(E, Result)|NormalizedGrammarRest]) :- normalized([prod(E, ResultsRest)|GrammarRest], NormalizedGrammarRest).
+normalized([prod(E, [Result|ResultsRest])|GrammarRest], [prod_1(nt(E), Result)|NormalizedGrammarRest]) :- normalized([prod(E, ResultsRest)|GrammarRest], NormalizedGrammarRest).
 
 % start(Grammar, Symbol).
 start([prod(E, _)|_], E).
@@ -54,45 +54,52 @@ nonterminals([prod(E, _)|GrammarRest], [E|NonterminalsRest]) :- nonterminals(Gra
 
 % nonterminals_wrapped(Grammar, Nonterminals).
 nonterminals_wrapped([], []).
-nonterminals_wrapped([prod(E, _)|GrammarRest], [[nt(E)]|NonterminalsRest]) :- nonterminals_wrapped(GrammarRest, NonterminalsRest).
+nonterminals_wrapped([prod(E, _)|GrammarRest], [nt(E)|NonterminalsRest]) :- nonterminals_wrapped(GrammarRest, NonterminalsRest).
 
 % first_map_keys(Grammar, Keys).
 first_map_keys(Grammar, Keys) :-
-	nonterminals_wrapped(Grammar, Nonterminals),
-	results(Grammar, Results), union(Nonterminals, Results, Keys).
+	nonterminals_wrapped(Grammar, Keys).
+	%nonterminals_wrapped(Grammar, Nonterminals).
+	%results(Grammar, Results), union(Nonterminals, Results, Keys).
+	%TODO: calculate
 
 % first_map(Grammar, Map).
 first_map(Grammar, Map) :- first_map_keys(Grammar, Keys), map_from_set(Keys, [], Map).
 
-% first_map_expand(Grammar, Map, MapExpanded).
-first_map_expand(Grammar, Map, MapExpanded) :-
-	normalized(Grammar, NormalizedGrammar),
-	first_map_expand2(NormalizedGrammar, Map, MapExpanded).
+% first_map_expand((Grammar, NormalizedGrammar), Map, MapExpanded).
+first_map_expand((Grammar, NormalizedGrammar), Map, Map) :-
+	first_map_expand_step((Grammar, NormalizedGrammar), Map, Map).
 
-first_map_expand2([prod([Nonterminal, [Result|ResultsRest]])|GrammarRest], Map, MapExpanded) :-
-	expand_nonterminal(Grammar, Nonterminal, Result, Map, NewMap),
-	first_map_expand([prod([Nonterminal, [Result|ResultsRest]])|GrammarRest], Map, MapExpanded).
-	%TODO
+first_map_expand((Grammar, NormalizedGrammar), Map, MapExpanded) :-
+	first_map_expand_step((Grammar, NormalizedGrammar), Map, NewMap),
+	first_map_expand((Grammar, NormalizedGrammar), NewMap, MapExpanded).
+
+first_map_expand_step((Grammar, []), Map, Map).
+first_map_expand_step((Grammar, [prod_1(Nonterminal, Result)|GrammarRest]), Map, MapExpanded) :-
+	format("Expanding ~p -> ~p\n", [Nonterminal, Result]),
+	expand_nonterminal((Grammar, NormalizedGrammar, Terminals), Nonterminal, Result, Map, NewMap),
+	first_map_expand_step((Grammar, GrammarRest), NewMap, MapExpanded).
 
 expand_test(Grammar, Expanded) :-
 	first_map(Grammar, Map),
-	first_map_expand(Grammar, Map, Expanded).
+	normalized(Grammar, NormalizedGrammar),
+	first_map_expand((Grammar, NormalizedGrammar), Map, Expanded).
 
-expand_nonterminal(Grammar, Nonterminal, [], Map, MapExpanded) :-
+expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [], Map, MapExpanded) :-
 	add_to_first_set(Map, Nonterminal, [epsilon_0], MapExpanded).
 
-expand_nonterminal(Grammar, Nonterminal, [Symbol|_], Map, MapExpanded) :-
+expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|_], Map, MapExpanded) :-
 	is_terminal(Grammar, Symbol),
 	add_to_first_set(Map, Nonterminal, [Symbol], MapExpanded).
 
-expand_nonterminal(Grammar, Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
+expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
 	map_search(Map, Symbol, FirstSet),
 	list_remove(FirstSet, epsilon_0, FirstSetWithoutEpsilon),
 	add_to_first_set(Map, Nonterminal, FirstSetWithoutEpsilon, NewMap),
-	member(epsilon_0, FirstSet), !,
-	expand_nonterminal(Grammar, Nonterminal, SymbolsRest, NewMap, MapExpanded).
+	member(epsilon_0, FirstSet), !.
+	% expand_nonterminal(Grammar, Nonterminal, SymbolsRest, NewMap, MapExpanded).
 
-expand_nonterminal(Grammar, Nonterminal, [Symbol|_], Map, MapExpanded) :-
+expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|_], Map, MapExpanded) :-
 	map_search(Map, Symbol, FirstSet),
 	list_remove(FirstSet, epsilon_0, FirstSetWithoutEpsilon), %TODO: do we need this? it does not contain epsilon from previous case
 	add_to_first_set(Map, Nonterminal, FirstSetWithoutEpsilon, MapExpanded).
@@ -101,6 +108,7 @@ add_to_first_set(Map, Key, Symbols, NewMap) :-
 	map_search(Map, Key, FirstSet),
 	union(FirstSet, Symbols, ExpandedFirstSet),
 	map_replace(Map, Key, ExpandedFirstSet, NewMap).
+	%, format("First(~p) <- ~p\n", [Key, Symbols]).
 
 
 %TODO:
