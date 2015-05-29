@@ -12,6 +12,7 @@ user:runtime_entry(start):-
 	w_1(first_map_keys, ex1),
 	w_1(first_map, ex1),
 	w_1(first, ex1),
+	w_1(test_firsts, ex1),
 	w_1(follow, ex1).
 
 write_grammar(N) :- grammar(N, G), write(G), write('\n').
@@ -20,8 +21,8 @@ w_1(Predicate, Name) :- grammar(Name, Grammar), call(Predicate, Grammar, X), wri
 % write_follow(N) :- grammar(N, G), follow(G, X), write(X), write('\n').
 % write_wyciagnij_slowa(N) :- grammar(N, G), wyciagnij_slowa(G, X), write(X), write('\n').
 
-% grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
-grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
+grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
+% grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
 
 % normalized(Grammar, NormalizedGrammar).
 normalized([], []).
@@ -50,6 +51,9 @@ extract_terminals([prod_1(E, [Terminal|SymbolsRest])|GrammarRest], [Terminal|Ter
 % is_terminal(Grammar, Symbol).
 is_terminal(Grammar, Symbol) :- terminals(Grammar, Terminals), member(Symbol, Terminals).
 
+% is_nonterminal(Symbol).
+is_nonterminal(nt(_)).
+
 % nonterminals(Grammar, Nonterminals).
 nonterminals([], []).
 nonterminals([prod(E, _)|GrammarRest], [E|NonterminalsRest]) :- nonterminals(GrammarRest, NonterminalsRest).
@@ -57,6 +61,10 @@ nonterminals([prod(E, _)|GrammarRest], [E|NonterminalsRest]) :- nonterminals(Gra
 % nonterminals_wrapped(Grammar, Nonterminals).
 nonterminals_wrapped([], []).
 nonterminals_wrapped([prod(E, _)|GrammarRest], [nt(E)|NonterminalsRest]) :- nonterminals_wrapped(GrammarRest, NonterminalsRest).
+
+% set_without_epsilon(Set, SetWithoutEpsilon).
+set_without_epsilon(Set, SetWithoutEpsilon) :-
+	list_remove(Set, epsilon_0, SetWithoutEpsilon).
 
 % first(Grammar, First).
 first(Grammar, First) :-
@@ -113,12 +121,39 @@ add_to_map_of_sets(Map, Key, Symbols, NewMap) :-
 	union(FirstSet, Symbols, ExpandedFirstSet),
 	map_replace(Map, Key, ExpandedFirstSet, NewMap).
 
+unify(X, X).
+
+% first_from_symbols(FirstMap, Symbols, SymbolsFirstSet).
+first_from_symbols(FirstMap, [], [epsilon_0]).
+
+first_from_symbols(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet) :-
+	( is_nonterminal(Symbol) ->
+		map_search(FirstMap, Symbol, FirstSet),
+		( member(epsilon_0, FirstSet) ->
+			set_without_epsilon(FirstSet, FirstSetWithoutEpsilon),
+			union(X, FirstSetWithoutEpsilon, SymbolsFirstSet),
+			first_from_symbols(FirstMap, SymbolsRest, X)
+		;
+			FirstSet = SymbolsFirstSet
+		)
+	;
+		[Symbol] = SymbolsFirstSet
+	).
+
+%TODO: remove
+% test_firsts
+test_firsts(Grammar, Firsts) :-
+	results(Grammar, [[H|R]|_]),
+	first(Grammar, FirstMap),
+	first_from_symbols(FirstMap, R, Firsts).
+
 
 % follow(Grammar, Follow).
 follow(Grammar, Follow) :-
 	follow_map(Grammar, Map),
 	normalized(Grammar, NormalizedGrammar),
-	follow_map_expand((Grammar, NormalizedGrammar), Map, Follow).
+	first(Grammar, First),
+	follow_map_expand((Grammar, NormalizedGrammar, First), Map, Follow).
 
 
 % follow_map(Grammar, Map).
@@ -128,40 +163,39 @@ follow_map(Grammar, NewMap) :-
 	start(Grammar, StartSymbol),
 	add_to_map_of_sets(Map, StartSymbol, [eof_0], NewMap).
 
-% follow_map_expand((Grammar, NormalizedGrammar), Map, MapExpanded).
-follow_map_expand((Grammar, NormalizedGrammar), Map, Map) :-
-	follow_map_expand_step((Grammar, NormalizedGrammar), Map, Map).
+% follow_map_expand((Grammar, NormalizedGrammar, First), Map, MapExpanded).
+follow_map_expand((Grammar, NormalizedGrammar, First), Map, Map) :-
+	follow_map_expand_step((Grammar, NormalizedGrammar, First), Map, Map).
 
-follow_map_expand((Grammar, NormalizedGrammar), Map, MapExpanded) :-
-	follow_map_expand_step((Grammar, NormalizedGrammar), Map, NewMap),
-	follow_map_expand((Grammar, NormalizedGrammar), NewMap, MapExpanded).
+follow_map_expand((Grammar, NormalizedGrammar, First), Map, MapExpanded) :-
+	follow_map_expand_step((Grammar, NormalizedGrammar, First), Map, NewMap),
+	follow_map_expand((Grammar, NormalizedGrammar, First), NewMap, MapExpanded).
 
-follow_map_expand_step((Grammar, []), Map, Map).
+follow_map_expand_step((Grammar, [], First), Map, Map).
 
-follow_map_expand_step((Grammar, [prod_1(Nonterminal, Result)|GrammarRest]), Map, MapExpanded) :-
+follow_map_expand_step((Grammar, [prod_1(Nonterminal, Result)|GrammarRest], First), Map, MapExpanded) :-
 	% format("Expanding ~p -> ~p\n", [Nonterminal, Result]),
-	follow_expand_nonterminal((Grammar, NormalizedGrammar, Terminals), Nonterminal, Result, Map, NewMap),
-	follow_map_expand_step((Grammar, GrammarRest), NewMap, MapExpanded).
+	follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, Result, Map, NewMap),
+	follow_map_expand_step((Grammar, GrammarRest, First), NewMap, MapExpanded).
 
-follow_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [], Map, MapExpanded) :-
-	add_to_map_of_sets(Map, Nonterminal, [epsilon_0], MapExpanded).
+follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, [], Map, Map).
 
-follow_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|_], Map, MapExpanded) :-
-	is_terminal(Grammar, Symbol),
-	add_to_map_of_sets(Map, Nonterminal, [Symbol], MapExpanded).
-
-follow_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
-	map_search(Map, Symbol, Set),
-	list_remove(Set, epsilon_0, SetWithoutEpsilon),
-	add_to_map_of_sets(Map, Nonterminal, SetWithoutEpsilon, NewMap),
-	member(epsilon_0, Set), !,
-	follow_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, SymbolsRest, NewMap, MapExpanded).
-
-follow_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|_], Map, MapExpanded) :-
-	map_search(Map, Symbol, FirstSet),
-	list_remove(FirstSet, epsilon_0, FirstSetWithoutEpsilon), %TODO: do we need this? it does not contain epsilon from previous case
-	add_to_map_of_sets(Map, Nonterminal, FirstSetWithoutEpsilon, MapExpanded).
-
+follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
+	% format("Expanding ~p -> ~p\n", [Map, Symbol]),
+	( is_nonterminal(Symbol) ->
+		first_from_symbols(First, SymbolsRest, SymbolsFirstSet),
+		set_without_epsilon(SymbolsFirstSet, SymbolsFirstSetWithoutEpsilon),
+		add_to_map_of_sets(Map, Symbol, SymbolsFirstSetWithoutEpsilon, NewMap),
+		( member(epsilon_0, SymbolsFirstSet) ->
+			map_search(Map, Nonterminal, NonterminalFollow),
+			add_to_map_of_sets(NewMap, Symbol, NonterminalFollow, NewMap_2)
+		;
+			NewMap_2 = NewMap
+		),
+		follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, SymbolsRest, NewMap_2, MapExpanded)
+	;
+		follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, SymbolsRest, Map, MapExpanded)
+	).
 
 
 % results(Grammar, Results).
