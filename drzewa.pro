@@ -29,7 +29,7 @@ normalized([prod(E, [])|GrammarRest], NormalizedGrammar) :- normalized(GrammarRe
 normalized([prod(E, [Result|ResultsRest])|GrammarRest], [prod_1(nt(E), Result)|NormalizedGrammarRest]) :- normalized([prod(E, ResultsRest)|GrammarRest], NormalizedGrammarRest).
 
 % start(Grammar, Symbol).
-start([prod(E, _)|_], E).
+start([prod(E, _)|_], nt(E)).
 
 % terminals(Grammar, Terminals).
 % terminals(Grammar, Terminals) :- extract_terminals(Grammar, X), list_to_set(X, Terminals).
@@ -116,14 +116,17 @@ add_to_map_of_sets(Map, Key, Symbols, NewMap) :-
 
 % follow(Grammar, Follow).
 follow(Grammar, Follow) :-
-	first_map(Grammar, Map),
+	follow_map(Grammar, Map),
 	normalized(Grammar, NormalizedGrammar),
 	follow_map_expand((Grammar, NormalizedGrammar), Map, Follow).
 
-% COPY PASTE SINCE WE CAN'T USE CALL()
 
-% first_map(Grammar, Map).
-first_map(Grammar, Map) :- first_map_keys(Grammar, Keys), map_from_set(Keys, [], Map).
+% follow_map(Grammar, Map).
+follow_map(Grammar, NewMap) :-
+	first_map_keys(Grammar, Keys),
+	map_from_set(Keys, [], Map),
+	start(Grammar, StartSymbol),
+	add_to_map_of_sets(Map, StartSymbol, [eof_0], NewMap).
 
 % follow_map_expand((Grammar, NormalizedGrammar), Map, MapExpanded).
 follow_map_expand((Grammar, NormalizedGrammar), Map, Map) :-
@@ -134,6 +137,7 @@ follow_map_expand((Grammar, NormalizedGrammar), Map, MapExpanded) :-
 	follow_map_expand((Grammar, NormalizedGrammar), NewMap, MapExpanded).
 
 follow_map_expand_step((Grammar, []), Map, Map).
+
 follow_map_expand_step((Grammar, [prod_1(Nonterminal, Result)|GrammarRest]), Map, MapExpanded) :-
 	% format("Expanding ~p -> ~p\n", [Nonterminal, Result]),
 	follow_expand_nonterminal((Grammar, NormalizedGrammar, Terminals), Nonterminal, Result, Map, NewMap),
