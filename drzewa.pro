@@ -1,8 +1,8 @@
 % Piotr Daszkiewicz 219411
 
 user:runtime_entry(start):-
-	% write500(node(7, node(5, leaf, node(6, leaf, leaf)), node(8, leaf, node(10, leaf, leaf)))).
-	% write_follow(ex1).
+	w_1(test_fail, ex1),
+	w_1(test_success, ex1),
 	write_grammar(ex1),
 	w_1(normalized, ex1),
 	w_1(start, ex1),
@@ -19,10 +19,29 @@ user:runtime_entry(start):-
 	w_1(select, ex1).
 
 write_grammar(N) :- grammar(N, G), write(G), write('\n').
-w_1(Predicate, Name) :- grammar(Name, Grammar), call(Predicate, Grammar, X), write(Predicate), write(' : '), write(X), write('\n').
 
-% write_follow(N) :- grammar(N, G), follow(G, X), write(X), write('\n').
-% write_wyciagnij_slowa(N) :- grammar(N, G), wyciagnij_slowa(G, X), write(X), write('\n').
+w_1(Predicate, Name) :-
+	grammar(Name, Grammar),
+	print_results(Predicate, Grammar).
+
+print_result(Predicate, Result) :-
+	write(Predicate), write(' : '), write(Result), write('\n').
+
+print_results(Predicate, FirstParam) :-
+	( call(Predicate, FirstParam, X) ->
+		print_more(Predicate, FirstParam)
+	;
+		print_result(Predicate, 'FAIL')
+	).
+
+print_more(Predicate, FirstParam) :-
+	call(Predicate, FirstParam, X),
+	print_result(Predicate, X),
+	fail ; true.
+
+test_fail(_, _) :- fail.
+test_success(_, a).
+test_success(_, z).
 
 % grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
