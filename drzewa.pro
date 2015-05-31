@@ -16,7 +16,8 @@ user:runtime_entry(start):-
 	w_1(first, ex1),
 	w_1(test_firsts, ex1),
 	w_1(follow, ex1),
-	w_1(select, ex1).
+	w_1(select, ex1),
+	w_1(cycle_map, ex1).
 
 write_grammar(N) :- grammar(N, G), write(G), write('\n').
 
@@ -133,14 +134,6 @@ first_expand_nonterminal(NormalizedGrammar, Nonterminal, [Symbol|SymbolsRest], M
 		add_to_map_of_sets(Map, Nonterminal, [Symbol], MapExpanded)
 	).
 
-add_to_map_of_sets(Map, Key, Symbols, NewMap) :-
-	% format("First(~p) <- ~p\n", [Key, Symbols]),
-	map_search(Map, Key, FirstSet),
-	union(FirstSet, Symbols, ExpandedFirstSet),
-	map_replace(Map, Key, ExpandedFirstSet, NewMap).
-
-unify(X, X).
-
 % first_from_symbols(FirstMap, Symbols, SymbolsFirstSet).
 first_from_symbols(FirstMap, [], [epsilon_0]).
 
@@ -175,7 +168,7 @@ follow(Grammar, Follow) :-
 
 % follow_map(Grammar, Map).
 follow_map(Grammar, NewMap) :-
-	first_map_keys(Grammar, Keys),
+	nonterminals_wrapped(Grammar, Keys),
 	map_from_set(Keys, [], Map),
 	start(Grammar, StartSymbol),
 	add_to_map_of_sets(Map, StartSymbol, [eof_0], NewMap).
@@ -240,7 +233,6 @@ select_from_production((First, Follow), prod_1(Nonterminal, Result), ProductionS
 		ProductionSelect = ResultFirstSet
 	).
 
-
 % results(Grammar, Results).
 results(Grammar, Results) :- results(Grammar, Results, []).
 
@@ -248,6 +240,58 @@ results([], Results, Results).
 results([prod(Nonterminal, Result)|GrammarRest], Results, Accumulator) :-
 	union(Accumulator, Result, AccumulatorExpanded),
 	results(GrammarRest, Results, AccumulatorExpanded).
+
+% TODO
+% jestCykl(Grammar)
+exists_cycle(Grammar)
+
+exists_cycle(Grammar) :-
+	cycle_map(Grammar, Map),
+
+	cycle_map_expand((NormalizedGrammar, First), Map, Follow).
+	%TODO: CHECK
+
+% cycle_map(Grammar, CycleMap).
+cycle_map(Grammar, CycleMap) :-
+	nonterminals_wrapped(Grammar, Keys),
+	map_from_set(Keys, [], Map),
+	normalized(Grammar, NormalizedGrammar),
+	first(Grammar, First),
+	cycle_map_fill((NormalizedGrammar, First), Map, CycleMap).
+
+cycle_map_fill(([], First), Map, Map).
+
+cycle_map_fill(([prod_1(Nonterminal, Result)|GrammarRest], First), Map, MapFilled) :-
+	% format("Cyc1ed ~p -> ~p\n", [Nonterminal, Result]),
+	cycle_map_for_production(First, Nonterminal, [], Result, Map, NewMap),
+	% format("Cycled ~p -> ~p\n", [Nonterminal, Result]),
+	cycle_map_fill((GrammarRest, First), NewMap, MapFilled).
+
+% cycle_map_for_production(First, Nonterminal, ResultPrefix, ResultRest, Map, NewMap)
+cycle_map_for_production(First, Nonterminal, _, [], Map, Map).
+
+cycle_map_for_production(First, Nonterminal, SymbolsPrefix, [Symbol|SymbolsRest], Map, NewMap) :-
+	% format("T1ying ~p -> ~p ~p ~p\n", [Nonterminal, SymbolsPrefix, Symbol, SymbolsRest]),
+	first_from_symbols(First, SymbolsPrefix, SymbolsPrefixFirstSet),
+	first_from_symbols(First, SymbolsRest, SymbolsRestFirstSet),
+	( is_nonterminal(Symbol), member(epsilon_0, SymbolsPrefixFirstSet), member(epsilon_0, SymbolsRestFirstSet) ->
+		add_to_map_of_sets(Map, Nonterminal, [Symbol], MapExpanded),
+		append(SymbolsPrefix, [Symbol], NewSymbolsPrefix),
+		% format("Udalo sie ~p\n", [MapExpanded]),
+		cycle_map_for_production(First, Nonterminal, NewSymbolsPrefix, SymbolsRest, MapExpanded, NewMap)
+	;
+		Map = NewMap
+	).
+
+%TODO TRANSITIVE CLOSURE
+cycle_map_expand((NormalizedGrammar, First), Map, MapExpanded).
+cycle_map_expand((NormalizedGrammar, First), Map, MapExpanded) :-
+	cycle_map_expand_step(NormalizedGrammar, Map, NewMap),
+	( Map == NewMap ->
+		Map = MapExpanded
+	;
+		cycle_map_expand((NormalizedGrammar, First), NewMap, MapExpanded)
+	).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -284,3 +328,10 @@ map_replace(Map, Key, Value, NewMap) :- map_delete(Map, Key, MapWithoutKey), map
 % map_from_set(Set, DefaultValue, ?Map).
 map_from_set([], _, []).
 map_from_set([E|SetRest], DefaultValue, Map) :- map_insert(MapRest, E, DefaultValue, Map), map_from_set(SetRest, DefaultValue, MapRest).
+
+% add_to_map_of_sets(Map, Key, Values, NewMap)
+add_to_map_of_sets(Map, Key, Values, NewMap) :-
+	% format("Map(~p) <- ~p\n", [Key, Values]),
+	map_search(Map, Key, Set),
+	union(Set, Values, ExpandedSet),
+	map_replace(Map, Key, ExpandedSet, NewMap).
