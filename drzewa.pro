@@ -119,21 +119,19 @@ first_map_expand_step((Grammar, [prod_1(Nonterminal, Result)|GrammarRest]), Map,
 first_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [], Map, MapExpanded) :-
 	add_to_map_of_sets(Map, Nonterminal, [epsilon_0], MapExpanded).
 
-first_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|_], Map, MapExpanded) :-
-	is_terminal(Grammar, Symbol),
-	add_to_map_of_sets(Map, Nonterminal, [Symbol], MapExpanded).
-
 first_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
-	map_search(Map, Symbol, FirstSet),
-	list_remove(FirstSet, epsilon_0, FirstSetWithoutEpsilon),
-	add_to_map_of_sets(Map, Nonterminal, FirstSetWithoutEpsilon, NewMap),
-	member(epsilon_0, FirstSet), !,
-	first_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, SymbolsRest, NewMap, MapExpanded).
-
-first_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, [Symbol|_], Map, MapExpanded) :-
-	map_search(Map, Symbol, FirstSet),
-	list_remove(FirstSet, epsilon_0, FirstSetWithoutEpsilon), %TODO: do we need this? it does not contain epsilon from previous case
-	add_to_map_of_sets(Map, Nonterminal, FirstSetWithoutEpsilon, MapExpanded).
+	( is_nonterminal(Symbol) ->
+		map_search(Map, Symbol, FirstSet),
+		list_remove(FirstSet, epsilon_0, FirstSetWithoutEpsilon),
+		add_to_map_of_sets(Map, Nonterminal, FirstSetWithoutEpsilon, NewMap),
+		( member(epsilon_0, FirstSet) ->
+			first_expand_nonterminal((Grammar, NormalizedGrammar), Nonterminal, SymbolsRest, NewMap, MapExpanded)
+		;
+			NewMap = MapExpanded
+		)
+	;
+		add_to_map_of_sets(Map, Nonterminal, [Symbol], MapExpanded)
+	).
 
 add_to_map_of_sets(Map, Key, Symbols, NewMap) :-
 	% format("First(~p) <- ~p\n", [Key, Symbols]),
