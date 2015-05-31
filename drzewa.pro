@@ -1,3 +1,5 @@
+% Piotr Daszkiewicz 219411
+
 user:runtime_entry(start):-
 	% write500(node(7, node(5, leaf, node(6, leaf, leaf)), node(8, leaf, node(10, leaf, leaf)))).
 	% write_follow(ex1).
