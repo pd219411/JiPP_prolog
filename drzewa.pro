@@ -98,9 +98,6 @@ first(Grammar, First) :-
 % first_map_keys(Grammar, Keys).
 first_map_keys(Grammar, Keys) :-
 	nonterminals_wrapped(Grammar, Keys).
-	%nonterminals_wrapped(Grammar, Nonterminals).
-	%results(Grammar, Results), union(Nonterminals, Results, Keys).
-	%TODO: calculate
 
 % first_map(Grammar, Map).
 first_map(Grammar, Map) :- first_map_keys(Grammar, Keys), map_from_set(Keys, [], Map).
