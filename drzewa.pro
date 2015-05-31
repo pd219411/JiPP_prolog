@@ -13,7 +13,8 @@ user:runtime_entry(start):-
 	w_1(first_map, ex1),
 	w_1(first, ex1),
 	w_1(test_firsts, ex1),
-	w_1(follow, ex1).
+	w_1(follow, ex1),
+	w_1(select, ex1).
 
 write_grammar(N) :- grammar(N, G), write(G), write('\n').
 w_1(Predicate, Name) :- grammar(Name, Grammar), call(Predicate, Grammar, X), write(Predicate), write(' : '), write(X), write('\n').
@@ -21,7 +22,8 @@ w_1(Predicate, Name) :- grammar(Name, Grammar), call(Predicate, Grammar, X), wri
 % write_follow(N) :- grammar(N, G), follow(G, X), write(X), write('\n').
 % write_wyciagnij_slowa(N) :- grammar(N, G), wyciagnij_slowa(G, X), write(X), write('\n').
 
-grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
+% grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
+grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 % grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
 
 % normalized(Grammar, NormalizedGrammar).
@@ -195,6 +197,31 @@ follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, [Sym
 		follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, SymbolsRest, NewMap_2, MapExpanded)
 	;
 		follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, SymbolsRest, Map, MapExpanded)
+	).
+
+
+% select(Grammar, Select).
+select(Grammar, Select) :-
+	normalized(Grammar, NormalizedGrammar),
+	first(Grammar, First),
+	follow(Grammar, Follow),
+	select_list((NormalizedGrammar, First, Follow), Select).
+
+% select_list((NormalizedGrammar, First, Follow), Select)
+select_list(([], First, Follow), []).
+
+select_list(([prod_1(Nonterminal, Result)|GrammarRest], First, Follow), [ProductionSelect|SelectRest]) :-
+	select_from_production((First, Follow), prod_1(Nonterminal, Result), ProductionSelect),
+	select_list((GrammarRest, First, Follow), SelectRest).
+
+select_from_production((First, Follow), prod_1(Nonterminal, Result), ProductionSelect) :-
+	first_from_symbols(First, Result, ResultFirstSet),
+	( member(epsilon_0, ResultFirstSet) ->
+		set_without_epsilon(ResultFirstSet, ResultFirstSetWithoutEpsilon),
+		map_search(Follow, Nonterminal, NonterminalFollowSet),
+		union(ResultFirstSetWithoutEpsilon, NonterminalFollowSet, ProductionSelect)
+	;
+		ProductionSelect = ResultFirstSet
 	).
 
 
