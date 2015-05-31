@@ -102,13 +102,13 @@ first_map_keys(Grammar, Keys) :-
 % first_map(Grammar, Map).
 first_map(Grammar, Map) :- first_map_keys(Grammar, Keys), map_from_set(Keys, [], Map).
 
-% first_map_expand(NormalizedGrammar, Map, MapExpanded).
-first_map_expand(NormalizedGrammar, Map, Map) :-
-	first_map_expand_step(NormalizedGrammar, Map, Map).
-
 first_map_expand(NormalizedGrammar, Map, MapExpanded) :-
 	first_map_expand_step(NormalizedGrammar, Map, NewMap),
-	first_map_expand(NormalizedGrammar, NewMap, MapExpanded).
+	( Map == NewMap ->
+		Map = MapExpanded
+	;
+		first_map_expand(NormalizedGrammar, NewMap, MapExpanded)
+	).
 
 first_map_expand_step([], Map, Map).
 first_map_expand_step([prod_1(Nonterminal, Result)|GrammarRest], Map, MapExpanded) :-
@@ -165,7 +165,6 @@ test_firsts(Grammar, Firsts) :-
 	first(Grammar, FirstMap),
 	first_from_symbols(FirstMap, R, Firsts).
 
-
 % follow(Grammar, Follow).
 follow(Grammar, Follow) :-
 	follow_map(Grammar, Map),
@@ -182,12 +181,13 @@ follow_map(Grammar, NewMap) :-
 	add_to_map_of_sets(Map, StartSymbol, [eof_0], NewMap).
 
 % follow_map_expand((Grammar, NormalizedGrammar, First), Map, MapExpanded).
-follow_map_expand((Grammar, NormalizedGrammar, First), Map, Map) :-
-	follow_map_expand_step((Grammar, NormalizedGrammar, First), Map, Map).
-
 follow_map_expand((Grammar, NormalizedGrammar, First), Map, MapExpanded) :-
-	follow_map_expand_step((Grammar, NormalizedGrammar, First), Map, NewMap),
-	follow_map_expand((Grammar, NormalizedGrammar, First), NewMap, MapExpanded).
+	first_map_expand_step(NormalizedGrammar, Map, NewMap),
+	( Map == NewMap ->
+		Map = MapExpanded
+	;
+		follow_map_expand((Grammar, NormalizedGrammar, First), NewMap, MapExpanded)
+	).
 
 follow_map_expand_step((Grammar, [], First), Map, Map).
 
