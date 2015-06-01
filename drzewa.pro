@@ -45,8 +45,9 @@ test_success(_, a).
 test_success(_, z).
 
 % grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
-grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
+% grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 % grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
+grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [[nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
 
 % normalized(Grammar, NormalizedGrammar).
 normalized([], []).
@@ -60,17 +61,16 @@ start([prod(E, _)|_], nt(E)).
 % terminals(Grammar, Terminals) :- extract_terminals(Grammar, X), list_to_set(X, Terminals).
 terminals(Grammar, Terminals) :- normalized(Grammar, NormalizedGrammar), extract_terminals(NormalizedGrammar, Terminals).
 
-% extract_terminals([], []).
-% extract_terminals([prod(E, [])|GrammarRest], Terminals) :- terminals(GrammarRest, Terminals).
-% extract_terminals([prod(E, [[]|ResultsRest])|GrammarRest], Terminals) :- terminals([prod(E, ResultsRest)|GrammarRest], Terminals).
-% extract_terminals([prod(E, [[nt(_)|SymbolsRest]|ResultsRest])|GrammarRest], Terminals) :- terminals([prod(E, [SymbolsRest|ResultsRest])|GrammarRest], Terminals), !. %TODO: this cut for nt(_)?
-% extract_terminals([prod(E, [[Terminal|SymbolsRest]|ResultsRest])|GrammarRest], [Terminal|TerminalsReduced]) :- terminals([prod(E, [SymbolsRest|ResultsRest])|GrammarRest], TerminalsReduced).
-
 % extract_terminals(NormalizedGrammar, TerminalsList).
 extract_terminals([], []).
 extract_terminals([prod_1(E, [])|GrammarRest], Terminals) :- extract_terminals(GrammarRest, Terminals).
-extract_terminals([prod_1(E, [nt(_)|SymbolsRest])|GrammarRest], Terminals) :- extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], Terminals), !. %TODO: this cut for nt(_)?
-extract_terminals([prod_1(E, [Terminal|SymbolsRest])|GrammarRest], [Terminal|TerminalsReduced]) :- extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], TerminalsReduced).
+extract_terminals([prod_1(E, [Symbol|SymbolsRest])|GrammarRest], Terminals) :-
+	( is_nonterminal(Symbol) ->
+		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], Terminals)
+	;
+		Terminals = [Symbol|TerminalsReduced]
+		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], TerminalsReduced)
+	).
 
 % is_terminal(Grammar, Symbol).
 is_terminal(Grammar, Symbol) :- terminals(Grammar, Terminals), member(Symbol, Terminals).
@@ -224,6 +224,7 @@ select_list(([prod_1(Nonterminal, Result)|GrammarRest], First, Follow), [Product
 	select_list((GrammarRest, First, Follow), SelectRest).
 
 select_from_production((First, Follow), prod_1(Nonterminal, Result), ProductionSelect) :-
+	format("select_from_production ~p -> ~p\n", [Nonterminal, Result]),
 	first_from_symbols(First, Result, ResultFirstSet),
 	( member(epsilon_0, ResultFirstSet) ->
 		set_without_epsilon(ResultFirstSet, ResultFirstSetWithoutEpsilon),
@@ -243,13 +244,11 @@ results([prod(Nonterminal, Result)|GrammarRest], Results, Accumulator) :-
 
 % TODO
 % jestCykl(Grammar)
-exists_cycle(Grammar)
-
+% exists_cycle(Grammar)
 exists_cycle(Grammar) :-
 	cycle_map(Grammar, Map),
-
 	cycle_map_expand((NormalizedGrammar, First), Map, Follow).
-	%TODO: CHECK
+	%TODO: CHECK CLOSURE
 
 % cycle_map(Grammar, CycleMap).
 cycle_map(Grammar, CycleMap) :-
