@@ -20,7 +20,8 @@ debug_grammar(Grammar) :-
 	print_results_1X(cycle_exists, Gramar),
 	print_results_2X(test_firsts, Grammar),
 	print_results_2X(follow, Grammar),
-	print_results_2X(select, Grammar).
+	print_results_2X(select, Grammar),
+	print_results_1X(direct_left_recursion_exists, Grammar).
 
 
 print_result(Predicate, Result) :-
@@ -46,9 +47,10 @@ print_more_2X(Predicate, FirstParam) :-
 	print_result(Predicate, X),
 	fail ; true.
 
-% grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
+
+grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 % grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
-grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
+% grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
 % grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
 
 % normalized(Grammar, NormalizedGrammar).
@@ -323,6 +325,15 @@ self_cycle_exists([key_value(Source, Targets)|MapRest]) :-
 
 self_cycle_exists([_|MapRest]) :-
 	self_cycle_exists(MapRest).
+
+direct_left_recursion_exists(Grammar) :-
+	normalized(Grammar, NormalizedGrammar),
+	direct_left_recursion_exists_normalized(NormalizedGrammar).
+
+direct_left_recursion_exists_normalized([prod_1(Nonterminal, [Nonterminal|_])|_]).
+
+direct_left_recursion_exists_normalized([_|GrammarRest]) :-
+	direct_left_recursion_exists_normalized(GrammarRest).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
