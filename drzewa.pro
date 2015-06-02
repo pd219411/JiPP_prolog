@@ -14,10 +14,10 @@ user:runtime_entry(start):-
 	w_1(first_map_keys, ex1),
 	w_1(first_map, ex1),
 	w_1(first, ex1),
+	w_1(cycle_map, ex1),
 	w_1(test_firsts, ex1),
 	w_1(follow, ex1),
-	w_1(select, ex1),
-	w_1(cycle_map, ex1).
+	w_1(select, ex1).
 
 write_grammar(N) :- grammar(N, G), write(G), write('\n').
 
@@ -46,8 +46,8 @@ test_success(_, z).
 
 % grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 % grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
-% grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
-grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [[nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
+grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
+% grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
 
 % normalized(Grammar, NormalizedGrammar).
 normalized([], []).
@@ -59,7 +59,9 @@ start([prod(E, _)|_], nt(E)).
 
 % terminals(Grammar, Terminals).
 % terminals(Grammar, Terminals) :- extract_terminals(Grammar, X), list_to_set(X, Terminals).
-terminals(Grammar, Terminals) :- normalized(Grammar, NormalizedGrammar), extract_terminals(NormalizedGrammar, Terminals).
+terminals(Grammar, Terminals) :-
+	normalized(Grammar, NormalizedGrammar),
+	extract_terminals(NormalizedGrammar, Terminals).
 
 % extract_terminals(NormalizedGrammar, TerminalsList).
 extract_terminals([], []).
@@ -68,7 +70,7 @@ extract_terminals([prod_1(E, [Symbol|SymbolsRest])|GrammarRest], Terminals) :-
 	( is_nonterminal(Symbol) ->
 		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], Terminals)
 	;
-		Terminals = [Symbol|TerminalsReduced]
+		Terminals = [Symbol|TerminalsReduced],
 		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], TerminalsReduced)
 	).
 
@@ -89,6 +91,10 @@ nonterminals_wrapped([prod(E, _)|GrammarRest], [nt(E)|NonterminalsRest]) :- nont
 % set_without_epsilon(Set, SetWithoutEpsilon).
 set_without_epsilon(Set, SetWithoutEpsilon) :-
 	list_remove(Set, epsilon_0, SetWithoutEpsilon).
+
+% produces_epsilon(FirstSet)
+produces_epsilon([]).
+produces_epsilon(FirstSet) :- member(epsilon_0, FirstSet).
 
 % first(Grammar, First).
 first(Grammar, First) :-
@@ -138,17 +144,22 @@ first_expand_nonterminal(NormalizedGrammar, Nonterminal, [Symbol|SymbolsRest], M
 first_from_symbols(FirstMap, [], [epsilon_0]).
 
 first_from_symbols(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet) :-
+	first_from_symbols_2(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet, []).
+
+first_from_symbols_2(_, [], SymbolsFirstSet, SymbolsFirstSet).
+
+first_from_symbols_2(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet, Accumulator) :-
 	( is_nonterminal(Symbol) ->
 		map_search(FirstMap, Symbol, FirstSet),
-		( member(epsilon_0, FirstSet) ->
+		( produces_epsilon(FirstSet) ->
 			set_without_epsilon(FirstSet, FirstSetWithoutEpsilon),
-			union(X, FirstSetWithoutEpsilon, SymbolsFirstSet),
-			first_from_symbols(FirstMap, SymbolsRest, X)
+			union(Accumulator, FirstSetWithoutEpsilon, NewAccumulator),
+			first_from_symbols_2(FirstMap, SymbolsRest, SymbolsFirstSet, NewAccumulator)
 		;
-			FirstSet = SymbolsFirstSet
+			union(FirstSet, Accumulator, SymbolsFirstSet)
 		)
 	;
-		[Symbol] = SymbolsFirstSet
+		union([Symbol], Accumulator, SymbolsFirstSet)
 	).
 
 %TODO: remove
@@ -223,8 +234,10 @@ select_list(([prod_1(Nonterminal, Result)|GrammarRest], First, Follow), [Product
 	select_from_production((First, Follow), prod_1(Nonterminal, Result), ProductionSelect),
 	select_list((GrammarRest, First, Follow), SelectRest).
 
+% select_from_production((First, Follow), prod_1(Nonterminal, Result), [jajeczko]).
+
 select_from_production((First, Follow), prod_1(Nonterminal, Result), ProductionSelect) :-
-	format("select_from_production ~p -> ~p\n", [Nonterminal, Result]),
+	% format("select_from_production ~p -> ~p\n", [Nonterminal, Result]),
 	first_from_symbols(First, Result, ResultFirstSet),
 	( member(epsilon_0, ResultFirstSet) ->
 		set_without_epsilon(ResultFirstSet, ResultFirstSetWithoutEpsilon),
@@ -251,12 +264,13 @@ exists_cycle(Grammar) :-
 	%TODO: CHECK CLOSURE
 
 % cycle_map(Grammar, CycleMap).
-cycle_map(Grammar, CycleMap) :-
+cycle_map(Grammar, CycleMap2) :-
 	nonterminals_wrapped(Grammar, Keys),
 	map_from_set(Keys, [], Map),
 	normalized(Grammar, NormalizedGrammar),
 	first(Grammar, First),
-	cycle_map_fill((NormalizedGrammar, First), Map, CycleMap).
+	cycle_map_fill((NormalizedGrammar, First), Map, CycleMap),
+	cycle_closure(CycleMap, CycleMap2).
 
 cycle_map_fill(([], First), Map, Map).
 
@@ -273,7 +287,7 @@ cycle_map_for_production(First, Nonterminal, SymbolsPrefix, [Symbol|SymbolsRest]
 	% format("T1ying ~p -> ~p ~p ~p\n", [Nonterminal, SymbolsPrefix, Symbol, SymbolsRest]),
 	first_from_symbols(First, SymbolsPrefix, SymbolsPrefixFirstSet),
 	first_from_symbols(First, SymbolsRest, SymbolsRestFirstSet),
-	( is_nonterminal(Symbol), member(epsilon_0, SymbolsPrefixFirstSet), member(epsilon_0, SymbolsRestFirstSet) ->
+	( is_nonterminal(Symbol), produces_epsilon(SymbolsPrefixFirstSet), produces_epsilon(SymbolsRestFirstSet) ->
 		add_to_map_of_sets(Map, Nonterminal, [Symbol], MapExpanded),
 		append(SymbolsPrefix, [Symbol], NewSymbolsPrefix),
 		% format("Udalo sie ~p\n", [MapExpanded]),
@@ -282,15 +296,27 @@ cycle_map_for_production(First, Nonterminal, SymbolsPrefix, [Symbol|SymbolsRest]
 		Map = NewMap
 	).
 
-%TODO TRANSITIVE CLOSURE
-cycle_map_expand((NormalizedGrammar, First), Map, MapExpanded).
-cycle_map_expand((NormalizedGrammar, First), Map, MapExpanded) :-
-	cycle_map_expand_step(NormalizedGrammar, Map, NewMap),
+
+% cycle_closure(Map, MapExpanded)
+cycle_closure(Map, MapExpanded) :-
+	cycle_closure_step(Map, Map, NewMap),
+	% format("Step end\n", []),
 	( Map == NewMap ->
 		Map = MapExpanded
 	;
-		cycle_map_expand((NormalizedGrammar, First), NewMap, MapExpanded)
+		cycle_closure(NewMap, MapExpanded)
 	).
+
+cycle_closure_step([], Map, Map).
+
+cycle_closure_step([key_value(Nonterminal, [])|MapRest], Map, NewMap) :-
+	cycle_closure_step(MapRest, Map, NewMap).
+
+cycle_closure_step([key_value(Nonterminal, [Target|TargetsRest])|MapRest], Map, NewMap) :-
+	map_search(Map, Target, TargetTargets),
+	add_to_map_of_sets(Map, Nonterminal, TargetTargets, MapExpanded),
+	% format("Closure ~p ->\n        ~p\n", [Map, MapExpanded]),
+	cycle_closure_step([key_value(Nonterminal, TargetsRest)|MapRest], MapExpanded, NewMap).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -322,7 +348,10 @@ map_delete([key_value(Key, _)|MapRest], Key, MapRest).
 map_delete([key_value(DifferentKey, Value)|MapRest], Key, [key_value(DifferentKey, Value)|NewMapRest]) :- Key \== DifferentKey, map_delete(MapRest, Key, NewMapRest).
 
 % map_replace(Map, Key, Value, NewMap).
-map_replace(Map, Key, Value, NewMap) :- map_delete(Map, Key, MapWithoutKey), map_insert(MapWithoutKey, Key, Value, NewMap).
+map_replace([key_value(Key, _)|MapRest], Key, Value, [key_value(Key, Value)|MapRest]).
+map_replace([key_value(DifferentKey, DifferentValue)|MapRest], Key, Value, [key_value(DifferentKey, DifferentValue)|NewMapRest]) :-
+	Key \== DifferentKey,
+	map_replace(MapRest, Key, Value, NewMapRest).
 
 % map_from_set(Set, DefaultValue, ?Map).
 map_from_set([], _, []).
