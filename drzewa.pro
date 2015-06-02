@@ -1,48 +1,50 @@
 % Piotr Daszkiewicz 219411
 
 user:runtime_entry(start):-
-	w_1(test_fail, ex1),
-	w_1(test_success, ex1),
-	write_grammar(ex1),
-	w_1(normalized, ex1),
-	w_1(start, ex1),
-	w_1(terminals, ex1),
-	w_1(is_terminal, ex1),
-	w_1(nonterminals, ex1),
-	w_1(nonterminals_wrapped, ex1),
-	w_1(results, ex1),
-	w_1(first_map_keys, ex1),
-	w_1(first_map, ex1),
-	w_1(first, ex1),
-	w_1(cycle_map, ex1),
-	w_1(test_firsts, ex1),
-	w_1(follow, ex1),
-	w_1(select, ex1).
+	grammar(ex1, Grammar),
+	debug_grammar(Grammar).
 
-write_grammar(N) :- grammar(N, G), write(G), write('\n').
+debug_grammar(Grammar) :-
+	format("Grammar: ~p\n", [Grammar]),
+	print_results_2X(normalized, Grammar),
+	print_results_2X(start, Grammar),
+	print_results_2X(terminals, Grammar),
+	print_results_2X(is_terminal, Grammar),
+	print_results_2X(nonterminals, Grammar),
+	print_results_2X(nonterminals_wrapped, Grammar),
+	print_results_2X(results, Grammar),
+	print_results_2X(first_map_keys, Grammar),
+	print_results_2X(first_map, Grammar),
+	print_results_2X(first, Grammar),
+	print_results_2X(cycle_map, Grammar),
+	print_results_1X(cycle_exists, Gramar),
+	print_results_2X(test_firsts, Grammar),
+	print_results_2X(follow, Grammar),
+	print_results_2X(select, Grammar).
 
-w_1(Predicate, Name) :-
-	grammar(Name, Grammar),
-	print_results(Predicate, Grammar).
 
 print_result(Predicate, Result) :-
 	write(Predicate), write(' : '), write(Result), write('\n').
 
-print_results(Predicate, FirstParam) :-
-	( call(Predicate, FirstParam, X) ->
-		print_more(Predicate, FirstParam)
+print_results_1X(Predicate, FirstParam) :-
+	( call(Predicate, FirstParam) ->
+		print_result(Predicate, 'SUCCESS')
+		% print_more(Predicate, FirstParam)
 	;
 		print_result(Predicate, 'FAIL')
 	).
 
-print_more(Predicate, FirstParam) :-
+print_results_2X(Predicate, FirstParam) :-
+	( call(Predicate, FirstParam, X) ->
+		print_more_2X(Predicate, FirstParam)
+	;
+		print_result(Predicate, 'FAIL')
+	).
+
+print_more_2X(Predicate, FirstParam) :-
 	call(Predicate, FirstParam, X),
 	print_result(Predicate, X),
 	fail ; true.
-
-test_fail(_, _) :- fail.
-test_success(_, a).
-test_success(_, z).
 
 % grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 % grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
@@ -257,11 +259,11 @@ results([prod(Nonterminal, Result)|GrammarRest], Results, Accumulator) :-
 
 % TODO
 % jestCykl(Grammar)
-% exists_cycle(Grammar)
-exists_cycle(Grammar) :-
+
+% cycle_exists(Grammar)
+cycle_exists(Grammar) :-
 	cycle_map(Grammar, Map),
-	cycle_map_expand((NormalizedGrammar, First), Map, Follow).
-	%TODO: CHECK CLOSURE
+	self_cycle_exists(Map).
 
 % cycle_map(Grammar, CycleMap).
 cycle_map(Grammar, CycleMap2) :-
@@ -275,9 +277,7 @@ cycle_map(Grammar, CycleMap2) :-
 cycle_map_fill(([], First), Map, Map).
 
 cycle_map_fill(([prod_1(Nonterminal, Result)|GrammarRest], First), Map, MapFilled) :-
-	% format("Cyc1ed ~p -> ~p\n", [Nonterminal, Result]),
 	cycle_map_for_production(First, Nonterminal, [], Result, Map, NewMap),
-	% format("Cycled ~p -> ~p\n", [Nonterminal, Result]),
 	cycle_map_fill((GrammarRest, First), NewMap, MapFilled).
 
 % cycle_map_for_production(First, Nonterminal, ResultPrefix, ResultRest, Map, NewMap)
@@ -287,20 +287,21 @@ cycle_map_for_production(First, Nonterminal, SymbolsPrefix, [Symbol|SymbolsRest]
 	% format("T1ying ~p -> ~p ~p ~p\n", [Nonterminal, SymbolsPrefix, Symbol, SymbolsRest]),
 	first_from_symbols(First, SymbolsPrefix, SymbolsPrefixFirstSet),
 	first_from_symbols(First, SymbolsRest, SymbolsRestFirstSet),
-	( is_nonterminal(Symbol), produces_epsilon(SymbolsPrefixFirstSet), produces_epsilon(SymbolsRestFirstSet) ->
-		add_to_map_of_sets(Map, Nonterminal, [Symbol], MapExpanded),
+	( is_nonterminal(Symbol) ->
+		( produces_epsilon(SymbolsPrefixFirstSet), produces_epsilon(SymbolsRestFirstSet) ->
+			add_to_map_of_sets(Map, Nonterminal, [Symbol], MapExpanded)
+		;
+			MapExpanded = Map
+		),
 		append(SymbolsPrefix, [Symbol], NewSymbolsPrefix),
-		% format("Udalo sie ~p\n", [MapExpanded]),
 		cycle_map_for_production(First, Nonterminal, NewSymbolsPrefix, SymbolsRest, MapExpanded, NewMap)
 	;
 		Map = NewMap
 	).
 
-
 % cycle_closure(Map, MapExpanded)
 cycle_closure(Map, MapExpanded) :-
 	cycle_closure_step(Map, Map, NewMap),
-	% format("Step end\n", []),
 	( Map == NewMap ->
 		Map = MapExpanded
 	;
@@ -308,15 +309,20 @@ cycle_closure(Map, MapExpanded) :-
 	).
 
 cycle_closure_step([], Map, Map).
-
 cycle_closure_step([key_value(Nonterminal, [])|MapRest], Map, NewMap) :-
 	cycle_closure_step(MapRest, Map, NewMap).
 
 cycle_closure_step([key_value(Nonterminal, [Target|TargetsRest])|MapRest], Map, NewMap) :-
 	map_search(Map, Target, TargetTargets),
 	add_to_map_of_sets(Map, Nonterminal, TargetTargets, MapExpanded),
-	% format("Closure ~p ->\n        ~p\n", [Map, MapExpanded]),
 	cycle_closure_step([key_value(Nonterminal, TargetsRest)|MapRest], MapExpanded, NewMap).
+
+% self_cycle_exists(Map).
+self_cycle_exists([key_value(Source, Targets)|MapRest]) :-
+	member(Source, Targets).
+
+self_cycle_exists([_|MapRest]) :-
+	self_cycle_exists(MapRest).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
