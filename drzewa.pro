@@ -21,7 +21,8 @@ debug_grammar(Grammar) :-
 	print_results_2X(test_firsts, Grammar),
 	print_results_2X(follow, Grammar),
 	print_results_2X(select, Grammar),
-	print_results_1X(direct_left_recursion_exists, Grammar).
+	print_results_1X(direct_left_recursion_exists, Grammar),
+	print_results_2X(direct_left_recursion_remove, Grammar).
 
 
 print_result(Predicate, Result) :-
@@ -48,10 +49,12 @@ print_more_2X(Predicate, FirstParam) :-
 	fail ; true.
 
 
-grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
+% grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 % grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 % grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
 % grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
+grammar(ex1, [prod('A', [[nt('A'), a], [nt('A')], [b]])]).
+
 
 % normalized(Grammar, NormalizedGrammar).
 normalized([], []).
@@ -326,14 +329,56 @@ self_cycle_exists([key_value(Source, Targets)|MapRest]) :-
 self_cycle_exists([_|MapRest]) :-
 	self_cycle_exists(MapRest).
 
-direct_left_recursion_exists(Grammar) :-
-	normalized(Grammar, NormalizedGrammar),
-	direct_left_recursion_exists_normalized(NormalizedGrammar).
+direct_left_recursion_exists([Production|GrammarRest]) :-
+	direct_left_recursion_exists_nonterminal(Production) ;
+	direct_left_recursion_exists(GrammarRest).
 
-direct_left_recursion_exists_normalized([prod_1(Nonterminal, [Nonterminal|_])|_]).
+direct_left_recursion_exists_nonterminal(prod(StrippedNonterminal, [[Symbol|_]|ResultsRest])) :-
+	nt(StrippedNonterminal) = Symbol
+	;
+	direct_left_recursion_exists_nonterminal(prod(StrippedNonterminal, ResultsRest)).
 
-direct_left_recursion_exists_normalized([_|GrammarRest]) :-
-	direct_left_recursion_exists_normalized(GrammarRest).
+direct_left_recursion_remove(Grammar, NewGrammar) :-
+	nonterminals(Grammar, Nonterminals),
+	direct_left_recursion_remove(Nonterminals, Grammar, NewGrammar).
+
+direct_left_recursion_remove(_, [], []).
+direct_left_recursion_remove(Nonterminals, [Production|GrammarRest], [NewProductionsList|NewGrammarRest]) :-
+	%TODO: if contains recur and update nonterminals
+	direct_left_recursion_nonterminal_remove(Nonterminals, Production, NewProductionsList),
+	direct_left_recursion_remove(Nonterminals, GrammarRest, NewGrammarRest).
+
+
+direct_left_recursion_nonterminal_remove(Nonterminals, prod(StrippedNonterminal, Results), [prod(StrippedNonterminal, NewBeta), prod(NewStrippedNonterminal, NewAlpha_2)]) :-
+	list_remove(Results, [nt(StrippedNonterminal)], NewResults),
+	direct_left_recursion_prepare_results(prod(StrippedNonterminal, NewResults), [], Alpha, [], Beta),
+	format("~p -> ~p ->>> ~p ~p\n", [StrippedNonterminal, NewResults, Alpha, Beta]),
+	new_nonterminal(Nonterminals, StrippedNonterminal, NewStrippedNonterminal),
+	add_tails(Alpha, nt(NewStrippedNonterminal), NewAlpha_1),
+	append(NewAlpha_1, [[]], NewAlpha_2),
+	add_tails(Beta, nt(NewStrippedNonterminal), NewBeta).
+
+% direct_left_recursion_prepare_results(prod(), AlphaAccumulator, Alpha, BetaAccumulator, Beta).
+direct_left_recursion_prepare_results(prod(_, []), Alpha, Alpha, Beta, Beta).
+
+direct_left_recursion_prepare_results(prod(StrippedNonterminal, [Result|ResultsRest]), AlphaAccumulator, Alpha, BetaAccumulator, Beta) :-
+	( Result = [nt(StrippedNonterminal)|ResultRest] ->
+		NewAlphaAccumulator = [ResultRest|AlphaAccumulator],
+		NewBetaAccumulator = BetaAccumulator
+	;
+		NewAlphaAccumulator = AlphaAccumulator,
+		NewBetaAccumulator = [Result|BetaAccumulator]
+	),
+	direct_left_recursion_prepare_results(prod(StrippedNonterminal, ResultsRest), NewAlphaAccumulator, Alpha, NewBetaAccumulator, Beta).
+
+
+new_nonterminal(Nonterminals, Nonterminal, NewNonterminal) :-
+	atom_concat(Nonterminal, 'X', Candidate),
+	( member(Nonterminals, Candidate) ->
+		new_nonterminal(Nonterminals, Candidate, NewNonterminal)
+	;
+		Candidate = NewNonterminal
+	).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -380,3 +425,13 @@ add_to_map_of_sets(Map, Key, Values, NewMap) :-
 	map_search(Map, Key, Set),
 	union(Set, Values, ExpandedSet),
 	map_replace(Map, Key, ExpandedSet, NewMap).
+
+% add_tails(LisOfLists, Tail, NewListOfLists)
+add_tails([], _, []).
+add_tails([List|ListsRest], Tail, [NewList|NewListOfListsRest]) :-
+	append(List, [Tail], NewList),
+	add_tails(ListsRest, Tail, NewListOfListsRest).
+
+add_heads([], _, []).
+add_heads([List|ListsRest], Head, [[Head|List]|NewListOfListsRest]) :-
+	add_heads(ListsRest, Head, NewListOfListsRest).
