@@ -1,7 +1,7 @@
 % Piotr Daszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex1, Grammar),
+	grammar(ex2, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -49,11 +49,16 @@ print_more_2X(Predicate, FirstParam) :-
 	fail ; true.
 
 
-% grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
+grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
+grammar(ex2, [prod('A', [[nt('A'), x], [x]])]).
+
 % grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 % grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
 % grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
-grammar(ex1, [prod('A', [[nt('A'), a], [nt('A')], [b]])]).
+% grammar(ex1, [prod('A', [[nt('A'), a], [nt('A')], [b]]), prod('A1', [[nt('A')]])]).
+% grammar(ex1, [prod('A', [[a]])]).
+
+grammar(ex22, [prod('A', [[nt('A'), x], [x], [nt('A'), y], [y]])]).
 
 
 % normalized(Grammar, NormalizedGrammar).
@@ -339,20 +344,29 @@ direct_left_recursion_exists_nonterminal(prod(StrippedNonterminal, [[Symbol|_]|R
 	direct_left_recursion_exists_nonterminal(prod(StrippedNonterminal, ResultsRest)).
 
 direct_left_recursion_remove(Grammar, NewGrammar) :-
-	nonterminals(Grammar, Nonterminals),
-	direct_left_recursion_remove(Nonterminals, Grammar, NewGrammar).
+	direct_left_recursion_remove(Grammar, NewGrammar, []).
 
-direct_left_recursion_remove(_, [], []).
-direct_left_recursion_remove(Nonterminals, [Production|GrammarRest], [NewProductionsList|NewGrammarRest]) :-
-	%TODO: if contains recur and update nonterminals
-	direct_left_recursion_nonterminal_remove(Nonterminals, Production, NewProductionsList),
-	direct_left_recursion_remove(Nonterminals, GrammarRest, NewGrammarRest).
+% direct_left_recursion_remove(Grammar, NewGrammar, Accumulator).
+direct_left_recursion_remove([], NewGrammar, NewGrammar).
+
+direct_left_recursion_remove([Production|GrammarRest], NewGrammar, Accumulator) :-
+	% format("direct_left_recursion_remove ~p|..\n", [Production]),
+	( direct_left_recursion_exists([Production]) ->
+		nonterminals([Production|GrammarRest], NonterminalsGrammar),
+		nonterminals(Accumulator, NonterminalsAccumulator),
+		union(NonterminalsGrammar, NonterminalsAccumulator, Nonterminals),
+		direct_left_recursion_nonterminal_remove(Nonterminals, Production, NewProductionsList),
+		append(NewProductionsList, GrammarRest, ModifiedGrammar),
+		direct_left_recursion_remove(ModifiedGrammar, NewGrammar, Accumulator)
+	;
+		append(Accumulator, [Production], NewAccumulator),
+		direct_left_recursion_remove(GrammarRest, NewGrammar, NewAccumulator)
+	).
 
 
 direct_left_recursion_nonterminal_remove(Nonterminals, prod(StrippedNonterminal, Results), [prod(StrippedNonterminal, NewBeta), prod(NewStrippedNonterminal, NewAlpha_2)]) :-
 	list_remove(Results, [nt(StrippedNonterminal)], NewResults),
 	direct_left_recursion_prepare_results(prod(StrippedNonterminal, NewResults), [], Alpha, [], Beta),
-	format("~p -> ~p ->>> ~p ~p\n", [StrippedNonterminal, NewResults, Alpha, Beta]),
 	new_nonterminal(Nonterminals, StrippedNonterminal, NewStrippedNonterminal),
 	add_tails(Alpha, nt(NewStrippedNonterminal), NewAlpha_1),
 	append(NewAlpha_1, [[]], NewAlpha_2),
@@ -373,8 +387,9 @@ direct_left_recursion_prepare_results(prod(StrippedNonterminal, [Result|ResultsR
 
 
 new_nonterminal(Nonterminals, Nonterminal, NewNonterminal) :-
-	atom_concat(Nonterminal, 'X', Candidate),
-	( member(Nonterminals, Candidate) ->
+	% format("new_nonterminal ~p ~p ~p\n", [Nonterminals, Nonterminal, NewNonterminal]),
+	atom_concat(Nonterminal, '1', Candidate),
+	( member(Candidate, Nonterminals) ->
 		new_nonterminal(Nonterminals, Candidate, NewNonterminal)
 	;
 		Candidate = NewNonterminal
