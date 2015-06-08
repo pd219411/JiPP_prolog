@@ -235,21 +235,25 @@ follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, [Sym
 
 % select(Grammar, Select).
 select(Grammar, Select) :-
-	normalized(Grammar, NormalizedGrammar),
 	first(Grammar, First),
 	follow(Grammar, Follow),
-	select_list((NormalizedGrammar, First, Follow), Select).
+	select_list((Grammar, First, Follow), Select).
 
-% select_list((NormalizedGrammar, First, Follow), Select)
+% select_list((Grammar, First, Follow), Select)
 select_list(([], First, Follow), []).
 
-select_list(([prod_1(Nonterminal, Result)|GrammarRest], First, Follow), [ProductionSelect|SelectRest]) :-
-	select_from_production((First, Follow), prod_1(Nonterminal, Result), ProductionSelect),
-	select_list((GrammarRest, First, Follow), SelectRest).
+select_list(([prod(Nonterminal, Results)|GrammarRest], First, Follow), [SelectList|SelectsRest]) :-
+	select_from_productions((First, Follow), Nonterminal, Results, SelectList),
+	select_list((GrammarRest, First, Follow), SelectsRest).
 
-% select_from_production((First, Follow), prod_1(Nonterminal, Result), [jajeczko]).
+% select_from_productions((First, Follow), Nonterminal, Results, SelectList)
+select_from_productions(_, _, [], []).
 
-select_from_production((First, Follow), prod_1(Nonterminal, Result), ProductionSelect) :-
+select_from_productions((First, Follow), Nonterminal, [Result|ResultsRest], [ProductionSelect|SelectListRest]) :-
+	select_from_production((First, Follow), Nonterminal, Result, ProductionSelect),
+	select_from_productions((First, Follow), Nonterminal, ResultsRest, SelectListRest).
+
+select_from_production((First, Follow), Nonterminal, Result, ProductionSelect) :-
 	% format("select_from_production ~p -> ~p\n", [Nonterminal, Result]),
 	first_from_symbols(First, Result, ResultFirstSet),
 	( member(epsilon_0, ResultFirstSet) ->
@@ -400,8 +404,14 @@ new_nonterminal(Nonterminals, Nonterminal, NewNonterminal) :-
 
 is_LL1(Grammar) :-
 	select(Grammar, Select),
-	all_pairs(Select, SelectPairs),
-	is_LL1_pairs_disjoint(SelectPairs).
+	is_LL1_productions_ok(Select).
+
+is_LL1_productions_ok([]).
+
+is_LL1_productions_ok([Selects|SelectRest]) :-
+	all_pairs(Selects, SelectsPairs),
+	is_LL1_pairs_disjoint(SelectsPairs),
+	is_LL1_productions_ok(SelectRest).
 
 % is_LL1_pairs_disjoint(SelectPairs)
 is_LL1_pairs_disjoint([]).
