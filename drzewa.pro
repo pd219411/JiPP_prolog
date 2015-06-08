@@ -1,7 +1,7 @@
 % Piotr Daszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex2, Grammar),
+	grammar(ex5, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -22,7 +22,8 @@ debug_grammar(Grammar) :-
 	print_results_2X(follow, Grammar),
 	print_results_2X(select, Grammar),
 	print_results_1X(direct_left_recursion_exists, Grammar),
-	print_results_2X(direct_left_recursion_remove, Grammar).
+	print_results_2X(direct_left_recursion_remove, Grammar),
+	print_results_1X(is_LL1, Grammar).
 
 
 print_result(Predicate, Result) :-
@@ -51,8 +52,8 @@ print_more_2X(Predicate, FirstParam) :-
 
 grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 grammar(ex2, [prod('A', [[nt('A'), x], [x]])]).
+grammar(ex5, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 
-% grammar(ex1, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 % grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
 % grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
 % grammar(ex1, [prod('A', [[nt('A'), a], [nt('A')], [b]]), prod('A1', [[nt('A')]])]).
@@ -395,6 +396,20 @@ new_nonterminal(Nonterminals, Nonterminal, NewNonterminal) :-
 		Candidate = NewNonterminal
 	).
 
+% is_LL1(Grammar)
+
+is_LL1(Grammar) :-
+	select(Grammar, Select),
+	all_pairs(Select, SelectPairs),
+	is_LL1_pairs_disjoint(SelectPairs).
+
+% is_LL1_pairs_disjoint(SelectPairs)
+is_LL1_pairs_disjoint([]).
+
+is_LL1_pairs_disjoint([(A, B)|SelectPairsRest]) :-
+	intersection(A, B, []),
+	is_LL1_pairs_disjoint(SelectPairsRest).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 list_remove([], _, []).
@@ -450,3 +465,21 @@ add_tails([List|ListsRest], Tail, [NewList|NewListOfListsRest]) :-
 add_heads([], _, []).
 add_heads([List|ListsRest], Head, [[Head|List]|NewListOfListsRest]) :-
 	add_heads(ListsRest, Head, NewListOfListsRest).
+
+
+% all_pairs(List, Pairs).
+all_pairs(List, Pairs) :-
+	all_pairs(List, Pairs, []).
+
+% all_pairs(List, Pairs, Accumulator)
+all_pairs([], Pairs, Pairs).
+
+all_pairs([E|ListRest], Pairs, Accumulator) :-
+	pair_with_list(E, ListRest, ElementPairs),
+	append(Accumulator, ElementPairs, NewAccumulator),
+	all_pairs(ListRest, Pairs, NewAccumulator).
+
+% pair_with_list(One, List, Pairs)
+pair_with_list(_, [], []).
+pair_with_list(One, [Two|ListRest], [(One, Two)|PairsRest]) :-
+	pair_with_list(One, ListRest, PairsRest).
