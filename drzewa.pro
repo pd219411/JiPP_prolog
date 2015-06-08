@@ -420,10 +420,60 @@ is_LL1_pairs_disjoint([(A, B)|SelectPairsRest]) :-
 	intersection(A, B, []),
 	is_LL1_pairs_disjoint(SelectPairsRest).
 
+% TODO analiza LL
+% parse_tree(Grammar, Word, Tree)
+parse_tree(Grammar, Word, Tree) :-
+	start(Grammar, Start),
+	parse_LL([Start], Word, Tree).
+
+% parse_LL(Stack, Word, Tree)
+parse_LL([], [], _).
+
+parse_LL([StackTop|StackRest], [StackTop|WordRest], [StackTop|TreeRest]) :-
+	parse_LL(StackRest, WordRest, TreeRest).
+
+parse_LL([StackTop|StackRest], [StackTop|WordRest], [StackTop|TreeRest]) :-
+	parse_LL(StackRest, WordRest, TreeRest).
+
+parse_LL([StackTop|StackRest], Word, [StackTop|TreeRest]) :-
+	is_nonterminal(StackTop).
+	% FIND possible translations
+	% FOR EACH POSSIBLE TRANSLATION PUT RESULTS ON STACK
+	% PARSE SUBTREE
+
+% possible_actions(Grammar, Select, Nonterminal, TerminalOrNothing, Actions)
+possible_actions(Grammar, Select, Nonterminal, TerminalOrNothing, Actions) :-
+	find_production_and_select(Grammar, Select, Nonterminal, ResultsAndSelect),
+	possible_results(ResultsAndSelect, TerminalOrNothing, PossibleResults).
+	%TODO all that match terminal
+
+% possible_results(ResultsAndSelect, TerminalOrNothing, PossibleResults)
+possible_results(([], []), _, []).
+
+possible_results(([Result|ResultsRest], [Select|SelectsRest]), TerminalOrNothing, PossibleResults) :-
+	( matches_select(TerminalOrNothing, Select) ->
+		PossibleResults = [Result|PossibleResultsRest]
+	;
+		PossibleResults = PossibleResultsRest
+	),
+	possible_results((ResultsRest, SelectsRest), TerminalOrNothing, PossibleResultsRest).
+
+% matches_select(TerminalOrNothing, Select)
+matches_select([], []).
+
+matches_select([Terminal], Select) :-
+	member(Terminal, Select).
+
+% find_production_and_select(Grammar, Select, Nonterminal, ResultsAndSelect)
+find_production_and_select([prod(Nonterminal, Results)|GrammarRest], [ProductionSelect|SelectsRest], Nonterminal, (Results, ProductionSelect)).
+
+find_production_and_select([_|GrammarRest], [_|SelectsRest], Nonterminal, Pairs) :-
+	find_production_and_select(GrammarRest, SelectsRest, Nonterminal, Pairs).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 list_remove([], _, []).
-list_remove([X|A], X, B) :- list_remove(A, X, B). %TODO: cut here and remove not_eq check?
+list_remove([X|A], X, B) :- list_remove(A, X, B).
 list_remove([Y|A], X, [Y|B]) :- X \== Y, list_remove(A, X, B).
 
 not_member(E, []).
