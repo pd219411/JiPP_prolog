@@ -1,7 +1,7 @@
 % Piotr Daszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex5, Grammar),
+	grammar(ex23, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -17,7 +17,7 @@ debug_grammar(Grammar) :-
 	print_results_2X(first_map, Grammar),
 	print_results_2X(first, Grammar),
 	print_results_2X(cycle_map, Grammar),
-	print_results_1X(cycle_exists, Gramar),
+	print_results_1X(cycle_exists, Grammar),
 	print_results_2X(test_firsts, Grammar),
 	print_results_2X(follow, Grammar),
 	print_results_2X(select, Grammar),
@@ -38,7 +38,7 @@ print_results_1X(Predicate, FirstParam) :-
 	).
 
 print_results_2X(Predicate, FirstParam) :-
-	( call(Predicate, FirstParam, X) ->
+	( call(Predicate, FirstParam, _) ->
 		print_more_2X(Predicate, FirstParam)
 	;
 		print_result(Predicate, 'FAIL')
@@ -60,11 +60,12 @@ grammar(ex5, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod
 % grammar(ex1, [prod('A', [[a]])]).
 
 grammar(ex22, [prod('A', [[nt('A'), x], [x], [nt('A'), y], [y]])]).
+grammar(ex23, [prod('A', [[nt('B')]]), prod('B', [[b]])]).
 
 
 % normalized(Grammar, NormalizedGrammar).
 normalized([], []).
-normalized([prod(E, [])|GrammarRest], NormalizedGrammar) :- normalized(GrammarRest, NormalizedGrammar).
+normalized([prod(_, [])|GrammarRest], NormalizedGrammar) :- normalized(GrammarRest, NormalizedGrammar).
 normalized([prod(E, [Result|ResultsRest])|GrammarRest], [prod_1(nt(E), Result)|NormalizedGrammarRest]) :- normalized([prod(E, ResultsRest)|GrammarRest], NormalizedGrammarRest).
 
 % start(Grammar, Symbol).
@@ -78,7 +79,7 @@ terminals(Grammar, Terminals) :-
 
 % extract_terminals(NormalizedGrammar, TerminalsList).
 extract_terminals([], []).
-extract_terminals([prod_1(E, [])|GrammarRest], Terminals) :- extract_terminals(GrammarRest, Terminals).
+extract_terminals([prod_1(_, [])|GrammarRest], Terminals) :- extract_terminals(GrammarRest, Terminals).
 extract_terminals([prod_1(E, [Symbol|SymbolsRest])|GrammarRest], Terminals) :-
 	( is_nonterminal(Symbol) ->
 		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], Terminals)
@@ -133,19 +134,19 @@ first_map_expand(NormalizedGrammar, Map, MapExpanded) :-
 first_map_expand_step([], Map, Map).
 first_map_expand_step([prod_1(Nonterminal, Result)|GrammarRest], Map, MapExpanded) :-
 	% format("Expanding ~p -> ~p\n", [Nonterminal, Result]),
-	first_expand_nonterminal(NormalizedGrammar, Nonterminal, Result, Map, NewMap),
+	first_expand_nonterminal(Nonterminal, Result, Map, NewMap),
 	first_map_expand_step(GrammarRest, NewMap, MapExpanded).
 
-first_expand_nonterminal(NormalizedGrammar, Nonterminal, [], Map, MapExpanded) :-
+first_expand_nonterminal(Nonterminal, [], Map, MapExpanded) :-
 	add_to_map_of_sets(Map, Nonterminal, [epsilon_0], MapExpanded).
 
-first_expand_nonterminal(NormalizedGrammar, Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
+first_expand_nonterminal(Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
 	( is_nonterminal(Symbol) ->
 		map_search(Map, Symbol, FirstSet),
 		list_remove(FirstSet, epsilon_0, FirstSetWithoutEpsilon),
 		add_to_map_of_sets(Map, Nonterminal, FirstSetWithoutEpsilon, NewMap),
 		( member(epsilon_0, FirstSet) ->
-			first_expand_nonterminal(NormalizedGrammar, Nonterminal, SymbolsRest, NewMap, MapExpanded)
+			first_expand_nonterminal(Nonterminal, SymbolsRest, NewMap, MapExpanded)
 		;
 			NewMap = MapExpanded
 		)
@@ -154,7 +155,7 @@ first_expand_nonterminal(NormalizedGrammar, Nonterminal, [Symbol|SymbolsRest], M
 	).
 
 % first_from_symbols(FirstMap, Symbols, SymbolsFirstSet).
-first_from_symbols(FirstMap, [], [epsilon_0]).
+first_from_symbols(_, [], [epsilon_0]).
 
 first_from_symbols(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet) :-
 	first_from_symbols_2(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet, []).
@@ -178,7 +179,7 @@ first_from_symbols_2(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet, Accumulato
 %TODO: remove
 % test_firsts
 test_firsts(Grammar, Firsts) :-
-	results(Grammar, [[H|R]|_]),
+	results(Grammar, [[_|R]|_]),
 	first(Grammar, FirstMap),
 	first_from_symbols(FirstMap, R, Firsts).
 
@@ -206,16 +207,16 @@ follow_map_expand((Grammar, NormalizedGrammar, First), Map, MapExpanded) :-
 		follow_map_expand((Grammar, NormalizedGrammar, First), NewMap, MapExpanded)
 	).
 
-follow_map_expand_step((Grammar, [], First), Map, Map).
+follow_map_expand_step((_, [], _), Map, Map).
 
 follow_map_expand_step((Grammar, [prod_1(Nonterminal, Result)|GrammarRest], First), Map, MapExpanded) :-
 	% format("Expanding ~p -> ~p\n", [Nonterminal, Result]),
-	follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, Result, Map, NewMap),
+	follow_expand_nonterminal((Grammar, First), Nonterminal, Result, Map, NewMap),
 	follow_map_expand_step((Grammar, GrammarRest, First), NewMap, MapExpanded).
 
-follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, [], Map, Map).
+follow_expand_nonterminal((_, _), _, [], Map, Map).
 
-follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
+follow_expand_nonterminal((Grammar, First), Nonterminal, [Symbol|SymbolsRest], Map, MapExpanded) :-
 	% format("Expanding ~p -> ~p\n", [Map, Symbol]),
 	( is_nonterminal(Symbol) ->
 		first_from_symbols(First, SymbolsRest, SymbolsFirstSet),
@@ -227,9 +228,9 @@ follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, [Sym
 		;
 			NewMap_2 = NewMap
 		),
-		follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, SymbolsRest, NewMap_2, MapExpanded)
+		follow_expand_nonterminal((Grammar, First), Nonterminal, SymbolsRest, NewMap_2, MapExpanded)
 	;
-		follow_expand_nonterminal((Grammar, NormalizedGrammar, First), Nonterminal, SymbolsRest, Map, MapExpanded)
+		follow_expand_nonterminal((Grammar, First), Nonterminal, SymbolsRest, Map, MapExpanded)
 	).
 
 
@@ -240,7 +241,7 @@ select(Grammar, Select) :-
 	select_list((Grammar, First, Follow), Select).
 
 % select_list((Grammar, First, Follow), Select)
-select_list(([], First, Follow), []).
+select_list(([], _, _), []).
 
 select_list(([prod(Nonterminal, Results)|GrammarRest], First, Follow), [SelectList|SelectsRest]) :-
 	select_from_productions((First, Follow), Nonterminal, Results, SelectList),
@@ -268,7 +269,7 @@ select_from_production((First, Follow), Nonterminal, Result, ProductionSelect) :
 results(Grammar, Results) :- results(Grammar, Results, []).
 
 results([], Results, Results).
-results([prod(Nonterminal, Result)|GrammarRest], Results, Accumulator) :-
+results([prod(_, Result)|GrammarRest], Results, Accumulator) :-
 	union(Accumulator, Result, AccumulatorExpanded),
 	results(GrammarRest, Results, AccumulatorExpanded).
 
@@ -289,14 +290,14 @@ cycle_map(Grammar, CycleMap2) :-
 	cycle_map_fill((NormalizedGrammar, First), Map, CycleMap),
 	cycle_closure(CycleMap, CycleMap2).
 
-cycle_map_fill(([], First), Map, Map).
+cycle_map_fill(([], _), Map, Map).
 
 cycle_map_fill(([prod_1(Nonterminal, Result)|GrammarRest], First), Map, MapFilled) :-
 	cycle_map_for_production(First, Nonterminal, [], Result, Map, NewMap),
 	cycle_map_fill((GrammarRest, First), NewMap, MapFilled).
 
 % cycle_map_for_production(First, Nonterminal, ResultPrefix, ResultRest, Map, NewMap)
-cycle_map_for_production(First, Nonterminal, _, [], Map, Map).
+cycle_map_for_production(_, _, _, [], Map, Map).
 
 cycle_map_for_production(First, Nonterminal, SymbolsPrefix, [Symbol|SymbolsRest], Map, NewMap) :-
 	% format("T1ying ~p -> ~p ~p ~p\n", [Nonterminal, SymbolsPrefix, Symbol, SymbolsRest]),
@@ -324,7 +325,7 @@ cycle_closure(Map, MapExpanded) :-
 	).
 
 cycle_closure_step([], Map, Map).
-cycle_closure_step([key_value(Nonterminal, [])|MapRest], Map, NewMap) :-
+cycle_closure_step([key_value(_, [])|MapRest], Map, NewMap) :-
 	cycle_closure_step(MapRest, Map, NewMap).
 
 cycle_closure_step([key_value(Nonterminal, [Target|TargetsRest])|MapRest], Map, NewMap) :-
@@ -333,7 +334,7 @@ cycle_closure_step([key_value(Nonterminal, [Target|TargetsRest])|MapRest], Map, 
 	cycle_closure_step([key_value(Nonterminal, TargetsRest)|MapRest], MapExpanded, NewMap).
 
 % self_cycle_exists(Map).
-self_cycle_exists([key_value(Source, Targets)|MapRest]) :-
+self_cycle_exists([key_value(Source, Targets)|_]) :-
 	member(Source, Targets).
 
 self_cycle_exists([_|MapRest]) :-
@@ -401,7 +402,6 @@ new_nonterminal(Nonterminals, Nonterminal, NewNonterminal) :-
 	).
 
 % is_LL1(Grammar)
-
 is_LL1(Grammar) :-
 	select(Grammar, Select),
 	is_LL1_productions_ok(Select).
@@ -476,7 +476,7 @@ list_remove([], _, []).
 list_remove([X|A], X, B) :- list_remove(A, X, B).
 list_remove([Y|A], X, [Y|B]) :- X \== Y, list_remove(A, X, B).
 
-not_member(E, []).
+not_member(_, []).
 not_member(E, [X|L]) :- E \== X, not_member(E, L).
 
 union([], S, S).
