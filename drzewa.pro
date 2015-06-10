@@ -1,7 +1,7 @@
 % Piotr aDaszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex7, Grammar),
+	grammar(ex8, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -380,7 +380,7 @@ direct_left_recursion_nonterminal_remove(Nonterminals, prod(StrippedNonterminal,
 	( direct_left_recursion_exists([prod(StrippedNonterminal, Results)]) ->
 		list_remove(Results, [nt(StrippedNonterminal)], NewResults),
 		direct_left_recursion_prepare_results(prod(StrippedNonterminal, NewResults), [], Alpha, [], Beta),
-		%TODO : Beta musi by niepuste!!!!
+		nonempty(Beta),
 		new_nonterminal(Nonterminals, StrippedNonterminal, NewStrippedNonterminal),
 		add_tails(Alpha, [nt(NewStrippedNonterminal)], NewAlpha_1),
 		append(NewAlpha_1, [[]], NewAlpha_2),
@@ -651,3 +651,5 @@ all_pairs([E|ListRest], Pairs, Accumulator) :-
 pair_with_list(_, [], []).
 pair_with_list(One, [Two|ListRest], [(One, Two)|PairsRest]) :-
 	pair_with_list(One, ListRest, PairsRest).
+
+nonempty([_|_]).
