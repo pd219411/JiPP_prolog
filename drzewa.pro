@@ -1,7 +1,7 @@
 % Piotr Daszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex6, Grammar),
+	grammar(ex_all_2, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -23,6 +23,7 @@ debug_grammar(Grammar) :-
 	print_results_2X(select, Grammar),
 	print_results_1X(direct_left_recursion_exists, Grammar),
 	print_results_2X(direct_left_recursion_remove, Grammar),
+	print_results_2X(all_left_recursion_remove, Grammar),
 	print_results_1X(is_LL1, Grammar),
 	print_results_2X(nonterminals_topological_sort, Grammar).
 
@@ -58,7 +59,14 @@ grammar(ex6, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), p
 grammar(ex8, [prod('A', [[nt('A'), a]])]).
 
 
-% grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
+grammar(ex_cykl, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
+grammar(ex_all, [prod('A', [[nt('A'), a], [nt('B'), a], [c]]), prod('B', [[nt('A'), b], [nt('B'), b], [c]])]).
+grammar(ex_all_2, [
+	prod('A', [[nt('B'), a, nt('X')], [c, nt('X')]]),
+	prod('X', [[a, nt('X')], []]),
+	prod('B', [[c, nt('X'), b, nt('Y')], [d, nt('Y')]]),
+	prod('Y', [[a, nt('X'), b, nt('Y')], [b, nt('Y')], []])]).
+
 % grammar(ex1, [prod('A', [[nt('A'), a], [nt('A')], [b]]), prod('A1', [[nt('A')]])]).
 % grammar(ex1, [prod('A', [[a]])]).
 
@@ -78,17 +86,17 @@ start([prod(E, _)|_], nt(E)).
 % terminals(Grammar, Terminals) :- extract_terminals(Grammar, X), list_to_set(X, Terminals).
 terminals(Grammar, Terminals) :-
 	normalized(Grammar, NormalizedGrammar),
-	extract_terminals(NormalizedGrammar, Terminals).
+	extract_terminals(NormalizedGrammar, Terminals, []).
 
-% extract_terminals(NormalizedGrammar, TerminalsList).
-extract_terminals([], []).
-extract_terminals([prod_1(_, [])|GrammarRest], Terminals) :- extract_terminals(GrammarRest, Terminals).
-extract_terminals([prod_1(E, [Symbol|SymbolsRest])|GrammarRest], Terminals) :-
+% extract_terminals(NormalizedGrammar, Terminals, Accumulator).
+extract_terminals([], Terminals, Terminals).
+extract_terminals([prod_1(_, [])|GrammarRest], Terminals, Accumulator) :- extract_terminals(GrammarRest, Terminals, Accumulator).
+extract_terminals([prod_1(E, [Symbol|SymbolsRest])|GrammarRest], Terminals, Accumulator) :-
 	( is_nonterminal(Symbol) ->
-		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], Terminals)
+		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], Terminals, Accumulator)
 	;
-		Terminals = [Symbol|TerminalsReduced],
-		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], TerminalsReduced)
+		union([Symbol], Accumulator, NewAccumulator),
+		extract_terminals([prod_1(E, SymbolsRest)|GrammarRest], Terminals, NewAccumulator)
 	).
 
 % is_terminal(Grammar, Symbol).
@@ -404,6 +412,22 @@ new_nonterminal(Nonterminals, Nonterminal, NewNonterminal) :-
 	;
 		Candidate = NewNonterminal
 	).
+
+%TODO: nondirect left recursion removal
+% less_in_order(A, Order, B)
+less_in_order(A, [B|OrderRest], C) :-
+	member(A, OrderRest),
+	B = C
+	;
+	less_in_order(A, OrderRest, C).
+
+% all_left_recursion_remove(Grammar, NewGrammar)
+
+all_left_recursion_remove(Grammar, NewGrammar) :-
+	\+ cycle_exists(Grammar),
+	nonterminals(Grammar, Nonterminals),
+	format("Order ~p\n", [Nonterminals]),
+	direct_left_recursion_remove(Grammar, NewGrammar).
 
 % is_LL1(Grammar)
 is_LL1(Grammar) :-
