@@ -1,7 +1,7 @@
 % Piotr aDaszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex1, Grammar),
+	grammar(ex7, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -421,13 +421,14 @@ less_in_order(A, [B|OrderRest], C) :-
 	less_in_order(A, OrderRest, C).
 
 % production_for_nonterminal(Grammar, Nonterminal, Production, OtherProductions)
-production_for_nonterminal([prod(ProductionNonterminal, Results)|GrammarRest], Nonterminal, Production, OtherProductions) :-
+production_for_nonterminal([prod(ProductionNonterminal, Results)|GrammarRest], Nonterminal, Production, BeforeProductions, AfterProductions) :-
 	( ProductionNonterminal = Nonterminal ->
 		Production = prod(ProductionNonterminal, Results),
-		OtherProductions = GrammarRest
+		BeforeProductions = [],
+		AfterProductions = GrammarRest
 	;
-		OtherProductions = [prod(ProductionNonterminal, Results)|OtherProductionsRest],
-		production_for_nonterminal(GrammarRest, Nonterminal, Production, OtherProductionsRest)
+		BeforeProductions = [prod(ProductionNonterminal, Results)|BeforeProductionsRest],
+		production_for_nonterminal(GrammarRest, Nonterminal, Production, BeforeProductionsRest, AfterProductions)
 	).
 
 % all_left_recursion_remove(Grammar, NewGrammar)
@@ -446,9 +447,11 @@ all_left_recursion_loop(Grammar, Done, [Current|ToDoRest], NewGrammar) :-
 % all_left_recursion_inner_loop(Grammar, Done, Current, NewGrammar)
 all_left_recursion_inner_loop(Grammar, [], Current, NewGrammar) :-
 	%TODO: remove direct for Current
-	% direct_left_recursion_remove(Grammar, NewGrammar).
-	Grammar = NewGrammar.
-	%format("Inner END: ~p\n", [Current]).
+	production_for_nonterminal(Grammar, Current, Production, BeforeProductions, AfterProductions),
+	nonterminals(Grammar, Nonterminals),
+	direct_left_recursion_nonterminal_remove(Nonterminals, Production, NewProductionsList),
+	append(BeforeProductions, NewProductionsList, PartialGrammar),
+	append(PartialGrammar, AfterProductions, NewGrammar).
 
 all_left_recursion_inner_loop(Grammar, [Before|DoneRest], Current, NewGrammar) :-
 	% format("Inner: ~p ~p\n", [[Before|DoneRest], Current]),
@@ -456,16 +459,16 @@ all_left_recursion_inner_loop(Grammar, [Before|DoneRest], Current, NewGrammar) :
 	all_left_recursion_inner_loop(ChangedGrammar, DoneRest, Current, NewGrammar).
 
 all_left_recursion_fix(Grammar, Before, Current, NewGrammar) :-
-	production_for_nonterminal(Grammar, Current, prod(Current, Results), OtherProductions),
+	production_for_nonterminal(Grammar, Current, prod(Current, Results), BeforeProductions, AfterProductions),
 	all_left_recursion_fix_production(Grammar, Results, Before, NewResults, []),
-	NewGrammar = [prod(Current, NewResults)|OtherProductions].
+	append(BeforeProductions, [prod(Current, NewResults)|AfterProductions], NewGrammar).
 
 % all_left_recursion_fix_production(Grammar, Results, Before, NewResults, Accumulator)
 all_left_recursion_fix_production(_, [], _, NewResults, NewResults).
 all_left_recursion_fix_production(Grammar, [Result|ResultsRest], Before, NewResults, Accumulator) :-
 	% format("all_left_recursion_fix_production ~p Before: ~p\n", [[Result|ResultsRest], Before]),
 	( Result = [nt(Before)|SymbolsRest] ->
-		production_for_nonterminal(Grammar, Before, prod(Before, BeforeResults), _),
+		production_for_nonterminal(Grammar, Before, prod(Before, BeforeResults), _, _),
 		format("FixPRO: prod: ~p rest: ~p\n", [BeforeResults, SymbolsRest]),
 		add_tails(BeforeResults, SymbolsRest, TransformedResults),
 		format("FixPRO: => ~p\n", [TransformedResults]),
