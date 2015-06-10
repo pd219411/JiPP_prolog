@@ -254,23 +254,23 @@ select(Grammar, Select) :-
 % select_list((Grammar, First, Follow), Select)
 select_list(([], _, _), []).
 
-select_list(([prod(Nonterminal, Results)|GrammarRest], First, Follow), [SelectList|SelectsRest]) :-
-	select_from_productions((First, Follow), Nonterminal, Results, SelectList),
+select_list(([prod(StrippedNonterminal, Results)|GrammarRest], First, Follow), [SelectList|SelectsRest]) :-
+	select_from_productions((First, Follow), StrippedNonterminal, Results, SelectList),
 	select_list((GrammarRest, First, Follow), SelectsRest).
 
-% select_from_productions((First, Follow), Nonterminal, Results, SelectList)
+% select_from_productions((First, Follow), StrippedNonterminal, Results, SelectList)
 select_from_productions(_, _, [], []).
 
-select_from_productions((First, Follow), Nonterminal, [Result|ResultsRest], [ProductionSelect|SelectListRest]) :-
-	select_from_production((First, Follow), Nonterminal, Result, ProductionSelect),
-	select_from_productions((First, Follow), Nonterminal, ResultsRest, SelectListRest).
+select_from_productions((First, Follow), StrippedNonterminal, [Result|ResultsRest], [ProductionSelect|SelectListRest]) :-
+	select_from_production((First, Follow), StrippedNonterminal, Result, ProductionSelect),
+	select_from_productions((First, Follow), StrippedNonterminal, ResultsRest, SelectListRest).
 
-select_from_production((First, Follow), Nonterminal, Result, ProductionSelect) :-
-	% format("select_from_production ~p -> ~p\n", [Nonterminal, Result]),
+select_from_production((First, Follow), StrippedNonterminal, Result, ProductionSelect) :-
+	% format("select_from_production ~p -> ~p\n", [StrippedNonterminal, Result]),
 	first_from_symbols(First, Result, ResultFirstSet),
 	( member(epsilon_0, ResultFirstSet) ->
 		set_without_epsilon(ResultFirstSet, ResultFirstSetWithoutEpsilon),
-		map_search(Follow, Nonterminal, NonterminalFollowSet),
+		map_search(Follow, nt(StrippedNonterminal), NonterminalFollowSet),
 		union(ResultFirstSetWithoutEpsilon, NonterminalFollowSet, ProductionSelect)
 	;
 		ProductionSelect = ResultFirstSet
