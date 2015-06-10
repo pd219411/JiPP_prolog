@@ -1,7 +1,7 @@
 % Piotr Daszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex23, Grammar),
+	grammar(ex6, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -23,7 +23,8 @@ debug_grammar(Grammar) :-
 	print_results_2X(select, Grammar),
 	print_results_1X(direct_left_recursion_exists, Grammar),
 	print_results_2X(direct_left_recursion_remove, Grammar),
-	print_results_1X(is_LL1, Grammar).
+	print_results_1X(is_LL1, Grammar),
+	print_results_2X(nonterminals_topological_sort, Grammar).
 
 
 print_result(Predicate, Result) :-
@@ -53,8 +54,10 @@ print_more_2X(Predicate, FirstParam) :-
 grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 grammar(ex2, [prod('A', [[nt('A'), x], [x]])]).
 grammar(ex5, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
+grammar(ex6, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
+grammar(ex8, [prod('A', [[nt('A'), a]])]).
 
-% grammar(ex1, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
+
 % grammar(ex1, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
 % grammar(ex1, [prod('A', [[nt('A'), a], [nt('A')], [b]]), prod('A1', [[nt('A')]])]).
 % grammar(ex1, [prod('A', [[a]])]).
@@ -373,6 +376,7 @@ direct_left_recursion_remove([Production|GrammarRest], NewGrammar, Accumulator) 
 direct_left_recursion_nonterminal_remove(Nonterminals, prod(StrippedNonterminal, Results), [prod(StrippedNonterminal, NewBeta), prod(NewStrippedNonterminal, NewAlpha_2)]) :-
 	list_remove(Results, [nt(StrippedNonterminal)], NewResults),
 	direct_left_recursion_prepare_results(prod(StrippedNonterminal, NewResults), [], Alpha, [], Beta),
+	%TODO : Beta musi by niepuste!!!!
 	new_nonterminal(Nonterminals, StrippedNonterminal, NewStrippedNonterminal),
 	add_tails(Alpha, nt(NewStrippedNonterminal), NewAlpha_1),
 	append(NewAlpha_1, [[]], NewAlpha_2),
@@ -469,6 +473,36 @@ find_production_and_select([prod(Nonterminal, Results)|GrammarRest], [Production
 
 find_production_and_select([_|GrammarRest], [_|SelectsRest], Nonterminal, Pairs) :-
 	find_production_and_select(GrammarRest, SelectsRest, Nonterminal, Pairs).
+
+%TODO
+% nonterminals_topological_sort(Grammar, Sorted)
+
+nonterminals_topological_sort(Grammar, Sorted) :-
+	cycle_map(Grammar, CycleMap),
+	topo_TODO(CycleMap, Sorted).
+	%topological_step(CycleMap, Removed, NewMap),
+	%topological_remove_nonterminal(NewMap, Removed, Sorted).
+
+topological_step([key_value(Source, Destination)|MapRest], Nonterminal, NewMap) :-
+	( Destination = [] ->
+		Nonterminal = Source,
+		NewMap = MapRest
+	;
+		NewMap = [key_value(Source, Destination)|NewMapRest],
+		topological_step(MapRest, Nonterminal, NewMapRest)
+	).
+
+% topological_remove_nonterminal(Map, Nonterminal, NewMap)
+topological_remove_nonterminal([], _, []).
+topological_remove_nonterminal([key_value(Source, Destination)|MapRest], Nonterminal, [key_value(Source, NewDestination)|NewMapRest]) :-
+	list_remove(Destination, Nonterminal, NewDestination),
+	topological_remove_nonterminal(MapRest, Nonterminal, NewMapRest).
+
+topo_TODO([], []).
+topo_TODO(Map, [Removed|ListRest]) :-
+	topological_step(Map, Removed, NewMap_1),
+	topological_remove_nonterminal(NewMap_1, Removed, NewMap_2),
+	topo_TODO(NewMap_2, ListRest).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
