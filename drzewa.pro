@@ -369,27 +369,26 @@ direct_left_recursion_remove([], NewGrammar, NewGrammar).
 
 direct_left_recursion_remove([Production|GrammarRest], NewGrammar, Accumulator) :-
 	% format("direct_left_recursion_remove ~p|..\n", [Production]),
-	( direct_left_recursion_exists([Production]) ->
-		nonterminals([Production|GrammarRest], NonterminalsGrammar),
-		nonterminals(Accumulator, NonterminalsAccumulator),
-		union(NonterminalsGrammar, NonterminalsAccumulator, Nonterminals),
-		direct_left_recursion_nonterminal_remove(Nonterminals, Production, NewProductionsList),
-		append(NewProductionsList, GrammarRest, ModifiedGrammar),
-		direct_left_recursion_remove(ModifiedGrammar, NewGrammar, Accumulator)
+	nonterminals([Production|GrammarRest], NonterminalsGrammar),
+	nonterminals(Accumulator, NonterminalsAccumulator),
+	union(NonterminalsGrammar, NonterminalsAccumulator, Nonterminals),
+	direct_left_recursion_nonterminal_remove(Nonterminals, Production, NewProductionsList),
+	append(Accumulator, NewProductionsList, NewAccumulator),
+	direct_left_recursion_remove(GrammarRest, NewGrammar, NewAccumulator).
+
+direct_left_recursion_nonterminal_remove(Nonterminals, prod(StrippedNonterminal, Results), NewProductionsList) :-
+	( direct_left_recursion_exists([prod(StrippedNonterminal, Results)]) ->
+		list_remove(Results, [nt(StrippedNonterminal)], NewResults),
+		direct_left_recursion_prepare_results(prod(StrippedNonterminal, NewResults), [], Alpha, [], Beta),
+		%TODO : Beta musi by niepuste!!!!
+		new_nonterminal(Nonterminals, StrippedNonterminal, NewStrippedNonterminal),
+		add_tails(Alpha, [nt(NewStrippedNonterminal)], NewAlpha_1),
+		append(NewAlpha_1, [[]], NewAlpha_2),
+		add_tails(Beta, [nt(NewStrippedNonterminal)], NewBeta),
+		NewProductionsList = [prod(StrippedNonterminal, NewBeta), prod(NewStrippedNonterminal, NewAlpha_2)]
 	;
-		append(Accumulator, [Production], NewAccumulator),
-		direct_left_recursion_remove(GrammarRest, NewGrammar, NewAccumulator)
+		NewProductionsList = [prod(StrippedNonterminal, Results)]
 	).
-
-
-direct_left_recursion_nonterminal_remove(Nonterminals, prod(StrippedNonterminal, Results), [prod(StrippedNonterminal, NewBeta), prod(NewStrippedNonterminal, NewAlpha_2)]) :-
-	list_remove(Results, [nt(StrippedNonterminal)], NewResults),
-	direct_left_recursion_prepare_results(prod(StrippedNonterminal, NewResults), [], Alpha, [], Beta),
-	%TODO : Beta musi by niepuste!!!!
-	new_nonterminal(Nonterminals, StrippedNonterminal, NewStrippedNonterminal),
-	add_tails(Alpha, [nt(NewStrippedNonterminal)], NewAlpha_1),
-	append(NewAlpha_1, [[]], NewAlpha_2),
-	add_tails(Beta, [nt(NewStrippedNonterminal)], NewBeta).
 
 % direct_left_recursion_prepare_results(prod(), AlphaAccumulator, Alpha, BetaAccumulator, Beta).
 direct_left_recursion_prepare_results(prod(_, []), Alpha, Alpha, Beta, Beta).
