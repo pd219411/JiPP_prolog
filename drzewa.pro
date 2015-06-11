@@ -6,12 +6,32 @@ user:runtime_entry(start):-
 process_grammar_list([]).
 process_grammar_list([Name|NamesRest]) :-
 	print_grammar(Name),
+	test_grammar(Name),
 	format("--------------------------------\n", []),
 	process_grammar_list(NamesRest).
 
 print_grammar(Name) :-
 	grammar(Name, Grammar),
 	debug_grammar(Grammar).
+
+test_grammar(Name) :-
+	grammar(Name, Grammar),
+	(jestLL1(Grammar) ->
+		FixedGrammar = Grammar
+	;
+		remLeftRec(Grammar, FixedGrammar)
+	),
+	test_words(Name, Words),
+	check_words(FixedGrammar, Words).
+
+check_words(_, []).
+check_words(Grammar, [Word|WordsRest]) :-
+	(analizaLL(Grammar, Word, Tree) ->
+		format("+ ~p  ~p\n", [Word, Tree])
+	;
+		format("- ~p\n", [Word])
+	),
+	check_words(Grammar, WordsRest).
 
 debug_grammar(Grammar) :-
 	format("Grammar: ~p\n", [Grammar]),
@@ -21,20 +41,17 @@ debug_grammar(Grammar) :-
 	print_results_2X(is_terminal, Grammar),
 	print_results_2X(nonterminals, Grammar),
 	print_results_2X(nonterminals_wrapped, Grammar),
-	print_results_2X(results, Grammar),
 	print_results_2X(first_map_keys, Grammar),
 	print_results_2X(first_map, Grammar),
 	print_results_2X(first, Grammar),
 	print_results_2X(cycle_map, Grammar),
 	print_results_1X(cycle_exists, Grammar),
-	print_results_2X(test_firsts, Grammar),
 	print_results_2X(follow, Grammar),
 	print_results_2X(select, Grammar),
 	print_results_1X(direct_left_recursion_exists, Grammar),
 	print_results_2X(direct_left_recursion_remove, Grammar),
 	print_results_2X(all_left_recursion_remove, Grammar),
-	print_results_1X(is_LL1, Grammar),
-	print_results_2X(nonterminals_topological_sort, Grammar).
+	print_results_1X(is_LL1, Grammar).
 
 
 print_result(Predicate, Result) :-
@@ -70,6 +87,15 @@ grammar(ex6, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), p
 grammar(ex7, [prod('A', [[a], [nt('B'), x]]), prod('B', [[b], [nt('A'), y]])]).
 grammar(ex8, [prod('A', [[nt('A'), a]])]).
 
+test_words(ex1, [[], [id], ['(', id, ')'], [id, '+', ident], [id,'+',id]]).
+test_words(ex2, []).
+test_words(ex3, []).
+test_words(ex4, []).
+test_words(ex5, []).
+test_words(ex6, []).
+test_words(ex7, []).
+test_words(ex8, []).
+
 %grammar(ex_cykl, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
 %grammar(ex_all, [prod('A', [[nt('A'), a], [nt('B'), a], [c]]), prod('B', [[nt('A'), b], [nt('B'), b], [c]])]).
 %grammar(ex_all_2, [
@@ -81,6 +107,14 @@ grammar(ex8, [prod('A', [[nt('A'), a]])]).
 %grammar(ex1_mod, [prod('E', [[nt('T'), '+', nt('E')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 %grammar(ex22, [prod('A', [[nt('A'), x], [x], [nt('A'), y], [y]])]).
 
+
+jestLL1(Gramatyka) :- is_LL1(Gramatyka).
+jestCykl(Gramatyka) :- cycle_exists(Gramatyka).
+remDirectLeftRec(ProdukcjeNT, PoprProdukcjeNT) :- direct_left_recursion_remove(ProdukcjeNT, PoprProdukcjeNT).
+remLeftRec(Gramatyka, GramatykaPopr) :- all_left_recursion_remove(Gramatyka, GramatykaPopr).
+%TODO: follow(+Gramatyka, -ZbioryFollow)
+%TODO: select
+analizaLL(Gramatyka, Slowo, Drzewo) :- parse_tree(Gramatyka, Slowo, Drzewo).
 
 % normalized(Grammar, NormalizedGrammar).
 normalized([], []).
@@ -197,13 +231,6 @@ first_from_symbols_2(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet, Accumulato
 		union([Symbol], Accumulator, SymbolsFirstSet)
 	).
 
-%TODO: remove
-% test_firsts
-test_firsts(Grammar, Firsts) :-
-	results(Grammar, [[_|R]|_]),
-	first(Grammar, FirstMap),
-	first_from_symbols(FirstMap, R, Firsts).
-
 eof_terminal(#).
 
 % follow(Grammar, Follow).
@@ -288,17 +315,6 @@ select_from_production((First, Follow), StrippedNonterminal, Result, ProductionS
 	;
 		ProductionSelect = ResultFirstSet
 	).
-
-% results(Grammar, Results).
-results(Grammar, Results) :- results(Grammar, Results, []).
-
-results([], Results, Results).
-results([prod(_, Result)|GrammarRest], Results, Accumulator) :-
-	union(Accumulator, Result, AccumulatorExpanded),
-	results(GrammarRest, Results, AccumulatorExpanded).
-
-% TODO
-% jestCykl(Grammar)
 
 % cycle_exists(Grammar)
 cycle_exists(Grammar) :-
@@ -458,7 +474,6 @@ all_left_recursion_loop(Grammar, Done, [Current|ToDoRest], NewGrammar) :-
 
 % all_left_recursion_inner_loop(Grammar, Done, Current, NewGrammar)
 all_left_recursion_inner_loop(Grammar, [], Current, NewGrammar) :-
-	%TODO: remove direct for Current
 	production_for_nonterminal(Grammar, Current, Production, BeforeProductions, AfterProductions),
 	nonterminals(Grammar, Nonterminals),
 	direct_left_recursion_nonterminal_remove(Nonterminals, Production, NewProductionsList),
@@ -481,9 +496,7 @@ all_left_recursion_fix_production(Grammar, [Result|ResultsRest], Before, NewResu
 	% format("all_left_recursion_fix_production ~p Before: ~p\n", [[Result|ResultsRest], Before]),
 	( Result = [nt(Before)|SymbolsRest] ->
 		production_for_nonterminal(Grammar, Before, prod(Before, BeforeResults), _, _),
-		format("FixPRO: prod: ~p rest: ~p\n", [BeforeResults, SymbolsRest]),
 		add_tails(BeforeResults, SymbolsRest, TransformedResults),
-		format("FixPRO: => ~p\n", [TransformedResults]),
 		append(Accumulator, TransformedResults, NewAccumulator),
 		all_left_recursion_fix_production(Grammar, ResultsRest, Before, NewResults, NewAccumulator)
 	;
@@ -509,8 +522,6 @@ is_LL1_pairs_disjoint([]).
 is_LL1_pairs_disjoint([(A, B)|SelectPairsRest]) :-
 	intersection(A, B, []),
 	is_LL1_pairs_disjoint(SelectPairsRest).
-
-% TODO analiza LL
 
 % nested_lists_to_tree(NestedLists, Tree)
 nested_lists_to_tree(NestedLists, Tree) :-
@@ -601,36 +612,6 @@ find_production_and_select([prod(Nonterminal, Results)|_], [ProductionSelect|_],
 
 find_production_and_select([_|GrammarRest], [_|SelectsRest], Nonterminal, Pairs) :-
 	find_production_and_select(GrammarRest, SelectsRest, Nonterminal, Pairs).
-
-%TODO: unused??
-% nonterminals_topological_sort(Grammar, Sorted)
-
-nonterminals_topological_sort(Grammar, Sorted) :-
-	cycle_map(Grammar, CycleMap),
-	topo_TODO(CycleMap, Sorted).
-	%topological_step(CycleMap, Removed, NewMap),
-	%topological_remove_nonterminal(NewMap, Removed, Sorted).
-
-topological_step([key_value(Source, Destination)|MapRest], Nonterminal, NewMap) :-
-	( Destination = [] ->
-		Nonterminal = Source,
-		NewMap = MapRest
-	;
-		NewMap = [key_value(Source, Destination)|NewMapRest],
-		topological_step(MapRest, Nonterminal, NewMapRest)
-	).
-
-% topological_remove_nonterminal(Map, Nonterminal, NewMap)
-topological_remove_nonterminal([], _, []).
-topological_remove_nonterminal([key_value(Source, Destination)|MapRest], Nonterminal, [key_value(Source, NewDestination)|NewMapRest]) :-
-	list_remove(Destination, Nonterminal, NewDestination),
-	topological_remove_nonterminal(MapRest, Nonterminal, NewMapRest).
-
-topo_TODO([], []).
-topo_TODO(Map, [Removed|ListRest]) :-
-	topological_step(Map, Removed, NewMap_1),
-	topological_remove_nonterminal(NewMap_1, Removed, NewMap_2),
-	topo_TODO(NewMap_2, ListRest).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
