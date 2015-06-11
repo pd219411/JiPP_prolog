@@ -1,7 +1,16 @@
 % Piotr aDaszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex4, Grammar),
+	process_grammar_list([ex1, ex2, ex3, ex4, ex5, ex6, ex7, ex8]).
+
+process_grammar_list([]).
+process_grammar_list([Name|NamesRest]) :-
+	print_grammar(Name),
+	format("--------------------------------\n", []),
+	process_grammar_list(NamesRest).
+
+print_grammar(Name) :-
+	grammar(Name, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -54,28 +63,23 @@ print_more_2X(Predicate, FirstParam) :-
 
 grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 grammar(ex2, [prod('A', [[nt('A'), x], [x]])]).
+grammar(ex3, [prod('A', [[x, nt('A')], [x]])]).
 grammar(ex4, [prod('A', [[a, nt('B')], [a, nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 grammar(ex5, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 grammar(ex6, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
 grammar(ex7, [prod('A', [[a], [nt('B'), x]]), prod('B', [[b], [nt('A'), y]])]).
 grammar(ex8, [prod('A', [[nt('A'), a]])]).
 
+%grammar(ex_cykl, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
+%grammar(ex_all, [prod('A', [[nt('A'), a], [nt('B'), a], [c]]), prod('B', [[nt('A'), b], [nt('B'), b], [c]])]).
+%grammar(ex_all_2, [
+%	prod('A', [[nt('B'), a, nt('X')], [c, nt('X')]]),
+%	prod('X', [[a, nt('X')], []]),
+%	prod('B', [[c, nt('X'), b, nt('Y')], [d, nt('Y')]]),
+%	prod('Y', [[a, nt('X'), b, nt('Y')], [b, nt('Y')], []])]).
 
-grammar(ex_cykl, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
-grammar(ex_all, [prod('A', [[nt('A'), a], [nt('B'), a], [c]]), prod('B', [[nt('A'), b], [nt('B'), b], [c]])]).
-grammar(ex_all_2, [
-	prod('A', [[nt('B'), a, nt('X')], [c, nt('X')]]),
-	prod('X', [[a, nt('X')], []]),
-	prod('B', [[c, nt('X'), b, nt('Y')], [d, nt('Y')]]),
-	prod('Y', [[a, nt('X'), b, nt('Y')], [b, nt('Y')], []])]).
-
-grammar(ex1_mod, [prod('E', [[nt('T'), '+', nt('E')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
-
-% grammar(ex1, [prod('A', [[nt('A'), a], [nt('A')], [b]]), prod('A1', [[nt('A')]])]).
-% grammar(ex1, [prod('A', [[a]])]).
-
-grammar(ex22, [prod('A', [[nt('A'), x], [x], [nt('A'), y], [y]])]).
-grammar(ex23, [prod('A', [[nt('B')]]), prod('B', [[b]])]).
+%grammar(ex1_mod, [prod('E', [[nt('T'), '+', nt('E')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
+%grammar(ex22, [prod('A', [[nt('A'), x], [x], [nt('A'), y], [y]])]).
 
 
 % normalized(Grammar, NormalizedGrammar).
