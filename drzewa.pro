@@ -46,12 +46,18 @@ debug_grammar(Grammar) :-
 	print_results_2X(first, Grammar),
 	print_results_2X(cycle_map, Grammar),
 	print_results_1X(cycle_exists, Grammar),
-	print_results_2X(follow, Grammar),
+	print_results_2X(my_follow, Grammar),
 	print_results_2X(select, Grammar),
 	print_results_1X(direct_left_recursion_exists, Grammar),
 	print_results_2X(direct_left_recursion_remove, Grammar),
 	print_results_2X(all_left_recursion_remove, Grammar),
-	print_results_1X(is_LL1, Grammar).
+	print_results_1X(is_LL1, Grammar),
+	print_results_1X(jestLL1, Grammar),
+	print_results_1X(jestCykl, Grammar),
+	print_results_2X(remDirectLeftRec, Grammar),
+	print_results_2X(remLeftRec, Grammar),
+	print_results_2X(follow, Grammar),
+	print_results_2X(select, Grammar).
 
 
 print_result(Predicate, Result) :-
@@ -112,9 +118,16 @@ jestLL1(Gramatyka) :- is_LL1(Gramatyka).
 jestCykl(Gramatyka) :- cycle_exists(Gramatyka).
 remDirectLeftRec(ProdukcjeNT, PoprProdukcjeNT) :- direct_left_recursion_remove(ProdukcjeNT, PoprProdukcjeNT).
 remLeftRec(Gramatyka, GramatykaPopr) :- all_left_recursion_remove(Gramatyka, GramatykaPopr).
-%TODO: follow(+Gramatyka, -ZbioryFollow)
-%TODO: select
+follow(Gramatyka, ZbioryFollow) :-
+	my_follow(Gramatyka, MyFollow),
+	convert_my_follow(MyFollow, ZbioryFollow).
+% select
 analizaLL(Gramatyka, Slowo, Drzewo) :- parse_tree(Gramatyka, Slowo, Drzewo).
+
+% convert_my_follow(Follow, Converted)
+convert_my_follow([], []).
+convert_my_follow([key_value(nt(StrippedNonterminal), FollowSet)|FollowRest], [follow(StrippedNonterminal, FollowSet)|ConvertedRest]) :-
+	convert_my_follow(FollowRest, ConvertedRest).
 
 % normalized(Grammar, NormalizedGrammar).
 normalized([], []).
@@ -233,8 +246,8 @@ first_from_symbols_2(FirstMap, [Symbol|SymbolsRest], SymbolsFirstSet, Accumulato
 
 eof_terminal(#).
 
-% follow(Grammar, Follow).
-follow(Grammar, Follow) :-
+% my_follow(Grammar, Follow).
+my_follow(Grammar, Follow) :-
 	follow_map(Grammar, Map),
 	normalized(Grammar, NormalizedGrammar),
 	first(Grammar, First),
@@ -288,7 +301,7 @@ follow_expand_nonterminal((Grammar, First), Nonterminal, [Symbol|SymbolsRest], M
 % select(Grammar, Select).
 select(Grammar, Select) :-
 	first(Grammar, First),
-	follow(Grammar, Follow),
+	my_follow(Grammar, Follow),
 	select_list((Grammar, First, Follow), Select).
 
 % select_list((Grammar, First, Follow), Select)
