@@ -1,7 +1,7 @@
 % Piotr aDaszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex8, Grammar),
+	grammar(ex1, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -101,7 +101,9 @@ extract_terminals([prod_1(E, [Symbol|SymbolsRest])|GrammarRest], Terminals, Accu
 	).
 
 % is_terminal(Grammar, Symbol).
-is_terminal(Grammar, Symbol) :- terminals(Grammar, Terminals), member(Symbol, Terminals).
+is_terminal(Grammar, Symbol) :-
+	terminals(Grammar, Terminals),
+	member(Symbol, Terminals).
 
 % is_nonterminal(Symbol).
 is_nonterminal(nt(_)).
@@ -502,33 +504,45 @@ is_LL1_pairs_disjoint([(A, B)|SelectPairsRest]) :-
 % parse_tree(Grammar, Word, Tree)
 parse_tree(Grammar, Word, Tree) :-
 	start(Grammar, Start),
-	parse_LL([Start], Word, Tree).
+	select(Grammar, Select),
+	parse_LL(Grammar, Select, [Start], Word, Tree).
 
-% parse_LL(Stack, Word, Tree)
-parse_LL([], [], _).
+% parse_LL(_, _, Stack, Word, Tree)
+parse_LL(_, _, [], [], _) :-
+	format("DUPA\n", []).
 
-parse_LL([StackTop|StackRest], [StackTop|WordRest], [StackTop|TreeRest]) :-
-	parse_LL(StackRest, WordRest, TreeRest).
-
-parse_LL([StackTop|StackRest], [StackTop|WordRest], [StackTop|TreeRest]) :-
-	parse_LL(StackRest, WordRest, TreeRest).
-
-parse_LL([StackTop|StackRest], Word, [StackTop|TreeRest]) :-
-	is_nonterminal(StackTop).
-	% FIND possible translations
+parse_LL(Grammar, Select, [StackTop|StackRest], [WordTerminal|WordRest], [_|TreeRest]) :-
+	format("parse_LL ~p ~p\n", [[StackTop|StackRest], [WordTerminal|WordRest]]),
+	(StackTop = WordTerminal ->
+		parse_LL(Grammar, Select, StackRest, WordRest, TreeRest)
+	;
+		format("parse_LL NONTERM ~p\n", [StackTop]),
+		is_nonterminal(StackTop),
 	% FOR EACH POSSIBLE TRANSLATION PUT RESULTS ON STACK
 	% PARSE SUBTREE
+		possible_actions(Grammar, Select, StackTop, WordTerminal, PossibleActions),
+		format("Possible actions ~p | ~p => ~p\n", [StackTop, WordTerminal, PossibleActions]),
+		parse_LL_try(Grammar, Select, StackRest, [WordTerminal|WordRest], [StackTop|TreeRest], PossibleActions)
+	).
+
+% parse_LL_try(Grammar, Select, Stack, Word, Tree, PossibleActions)
+parse_LL_try(Grammar, Select, Stack, Word, Tree, [Action|PossibleActionsRest]) :-
+	append(Action, Stack, NewStack),
+	format("parse_LL_try ~p | ~p\n", [NewStack, Word]),
+	parse_LL(Grammar, Select, NewStack, Word, Tree).
+	%;
+	%parse_LL_try(Grammar, Select, Stack, Word, Tree, PossibleActionsRest).
 
 % possible_actions(Grammar, Select, Nonterminal, TerminalOrNothing, Actions)
-possible_actions(Grammar, Select, Nonterminal, TerminalOrNothing, Actions) :-
-	find_production_and_select(Grammar, Select, Nonterminal, ResultsAndSelect),
-	possible_results(ResultsAndSelect, TerminalOrNothing, PossibleResults).
-	%TODO all that match terminal
+possible_actions(Grammar, Select, nt(StrippedNonterminal), TerminalOrNothing, Actions) :-
+	find_production_and_select(Grammar, Select, StrippedNonterminal, ResultsAndSelect),
+	possible_results(ResultsAndSelect, [TerminalOrNothing], Actions).
 
 % possible_results(ResultsAndSelect, TerminalOrNothing, PossibleResults)
 possible_results(([], []), _, []).
 
 possible_results(([Result|ResultsRest], [Select|SelectsRest]), TerminalOrNothing, PossibleResults) :-
+	% format("possible_results ~p ~p ~p\n", [Result, Select, TerminalOrNothing]),
 	( matches_select(TerminalOrNothing, Select) ->
 		PossibleResults = [Result|PossibleResultsRest]
 	;
@@ -542,13 +556,16 @@ matches_select([], []).
 matches_select([Terminal], Select) :-
 	member(Terminal, Select).
 
+
+
+
 % find_production_and_select(Grammar, Select, Nonterminal, ResultsAndSelect)
-find_production_and_select([prod(Nonterminal, Results)|GrammarRest], [ProductionSelect|SelectsRest], Nonterminal, (Results, ProductionSelect)).
+find_production_and_select([prod(Nonterminal, Results)|_], [ProductionSelect|_], Nonterminal, (Results, ProductionSelect)).
 
 find_production_and_select([_|GrammarRest], [_|SelectsRest], Nonterminal, Pairs) :-
 	find_production_and_select(GrammarRest, SelectsRest, Nonterminal, Pairs).
 
-%TODO
+%TODO: unused??
 % nonterminals_topological_sort(Grammar, Sorted)
 
 nonterminals_topological_sort(Grammar, Sorted) :-
