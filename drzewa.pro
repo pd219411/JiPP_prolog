@@ -1,7 +1,7 @@
 % Piotr aDaszkiewicz 219411
 
 user:runtime_entry(start):-
-	grammar(ex1, Grammar),
+	grammar(ex4, Grammar),
 	debug_grammar(Grammar).
 
 debug_grammar(Grammar) :-
@@ -54,6 +54,7 @@ print_more_2X(Predicate, FirstParam) :-
 
 grammar(ex1, [prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 grammar(ex2, [prod('A', [[nt('A'), x], [x]])]).
+grammar(ex4, [prod('A', [[a, nt('B')], [a, nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 grammar(ex5, [prod('A', [[a, nt('R')]]), prod('R', [[nt('B')], [nt('C')]]), prod('B', [[b]]), prod('C', [[c]])]).
 grammar(ex6, [prod('S', [[nt('A'), a, nt('A'), b], [nt('B'), b, nt('B'), a]]), prod('A', [[]]), prod('B', [[]])]).
 grammar(ex7, [prod('A', [[a], [nt('B'), x]]), prod('B', [[b], [nt('A'), y]])]).
@@ -67,6 +68,8 @@ grammar(ex_all_2, [
 	prod('X', [[a, nt('X')], []]),
 	prod('B', [[c, nt('X'), b, nt('Y')], [d, nt('Y')]]),
 	prod('Y', [[a, nt('X'), b, nt('Y')], [b, nt('Y')], []])]).
+
+grammar(ex1_mod, [prod('E', [[nt('T'), '+', nt('E')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
 
 % grammar(ex1, [prod('A', [[nt('A'), a], [nt('A')], [b]]), prod('A1', [[nt('A')]])]).
 % grammar(ex1, [prod('A', [[a]])]).
@@ -197,7 +200,7 @@ test_firsts(Grammar, Firsts) :-
 	first(Grammar, FirstMap),
 	first_from_symbols(FirstMap, R, Firsts).
 
-eof_terminal('#').
+eof_terminal(#).
 
 % follow(Grammar, Follow).
 follow(Grammar, Follow) :-
@@ -504,37 +507,64 @@ is_LL1_pairs_disjoint([(A, B)|SelectPairsRest]) :-
 	is_LL1_pairs_disjoint(SelectPairsRest).
 
 % TODO analiza LL
-% parse_tree(Grammar, Word, Tree)
+
+% nested_lists_to_tree(NestedLists, Tree)
+nested_lists_to_tree(NestedLists, Tree) :-
+	( NestedLists = (Root, Children) ->
+		sublist_to_tree(Children, Subtrees),
+		Tree =.. [Root|Subtrees]
+	;
+		Tree = NestedLists
+	).
+
+% sublist_to_tree(Sublist, Subtrees)
+sublist_to_tree([], []).
+sublist_to_tree([Child|ChildrenRest], [ChildTree|SubtreesRest]) :-
+	nested_lists_to_tree(Child, ChildTree),
+	sublist_to_tree(ChildrenRest, SubtreesRest).
+
+% parse_tree(Grammar, Word, FillList)
 parse_tree(Grammar, Word, Tree) :-
 	start(Grammar, Start),
 	select(Grammar, Select),
-	parse_LL(Grammar, Select, [Start], Word, Tree).
+	eof_terminal(Eof),
+	append(Word, [Eof], WordWithEof),
+	parse_LL(Grammar, Select, [Start, Eof], WordWithEof, FillList),
+	FillList = [List, Eof],
+	nested_lists_to_tree(List, Tree).
 
 % parse_LL(_, _, Stack, Word, Tree)
-parse_LL(_, _, [], [], _) :-
-	format("DUPA\n", []).
+parse_LL(_, _, [], [], []).
 
-parse_LL(Grammar, Select, [StackTop|StackRest], [WordTerminal|WordRest], [_|TreeRest]) :-
-	format("parse_LL ~p ~p\n", [[StackTop|StackRest], [WordTerminal|WordRest]]),
+parse_LL(Grammar, Select, [StackTop|StackRest], [WordTerminal|WordRest], FillList) :-
+	% format("parse_LL Stack  ~p\n", [[StackTop|StackRest]]),
+	% format("parse_LL Word   ~p\n", [[WordTerminal|WordRest]]),
 	(StackTop = WordTerminal ->
-		parse_LL(Grammar, Select, StackRest, WordRest, TreeRest)
+		FillList = [ToFill|FillListRest],
+		ToFill = StackTop,
+		NewFillList = FillListRest,
+		parse_LL(Grammar, Select, StackRest, WordRest, NewFillList)
 	;
-		format("parse_LL NONTERM ~p\n", [StackTop]),
 		is_nonterminal(StackTop),
-	% FOR EACH POSSIBLE TRANSLATION PUT RESULTS ON STACK
-	% PARSE SUBTREE
+		FillList = [ToFill|FillListRest],
+		StackTop = nt(StrippedNonterminal),
+		ToFill = (StrippedNonterminal, Unknown),
+		% ToFill =.. [StrippedNonterminal|Unknown], Does Not Work :/
+		NewFillList = [Unknown|FillListRest],
 		possible_actions(Grammar, Select, StackTop, WordTerminal, PossibleActions),
-		format("Possible actions ~p | ~p => ~p\n", [StackTop, WordTerminal, PossibleActions]),
-		parse_LL_try(Grammar, Select, StackRest, [WordTerminal|WordRest], [StackTop|TreeRest], PossibleActions)
+		parse_LL_try(Grammar, Select, StackRest, [WordTerminal|WordRest], NewFillList, PossibleActions)
 	).
 
-% parse_LL_try(Grammar, Select, Stack, Word, Tree, PossibleActions)
-parse_LL_try(Grammar, Select, Stack, Word, Tree, [Action|PossibleActionsRest]) :-
+% parse_LL_try(Grammar, Select, Stack, Word, FillList, PossibleActions)
+parse_LL_try(Grammar, Select, Stack, Word, FillList, [Action|PossibleActionsRest]) :-
 	append(Action, Stack, NewStack),
-	format("parse_LL_try ~p | ~p\n", [NewStack, Word]),
-	parse_LL(Grammar, Select, NewStack, Word, Tree).
-	%;
-	%parse_LL_try(Grammar, Select, Stack, Word, Tree, PossibleActionsRest).
+	list_to_variables(Action, ActionVariables),
+	FillList = [ToFill|FillListRest],
+	ToFill = ActionVariables,
+	append(ActionVariables, FillListRest, NewFillList),
+	parse_LL(Grammar, Select, NewStack, Word, NewFillList)
+	;
+	parse_LL_try(Grammar, Select, Stack, Word, FillList, PossibleActionsRest).
 
 % possible_actions(Grammar, Select, Nonterminal, TerminalOrNothing, Actions)
 possible_actions(Grammar, Select, nt(StrippedNonterminal), TerminalOrNothing, Actions) :-
@@ -673,3 +703,8 @@ pair_with_list(One, [Two|ListRest], [(One, Two)|PairsRest]) :-
 	pair_with_list(One, ListRest, PairsRest).
 
 nonempty([_|_]).
+
+% list_to_variables(List, Variables)
+list_to_variables([], []).
+list_to_variables([_|ListRest], [_|VariablesRest]) :-
+	list_to_variables(ListRest, VariablesRest).
