@@ -1,4 +1,4 @@
-% Piotr aDaszkiewicz 219411
+% Piotr Daszkiewicz 219411
 
 user:runtime_entry(start):-
 	process_grammar_list([ex1, ex2, ex3, ex4, ex5, ex6, ex7, ex8]).
@@ -94,24 +94,22 @@ grammar(ex7, [prod('A', [[a], [nt('B'), x]]), prod('B', [[b], [nt('A'), y]])]).
 grammar(ex8, [prod('A', [[nt('A'), a]])]).
 
 test_words(ex1, [[], [id], ['(', id, ')'], [id, '+', ident], [id,'+',id]]).
-test_words(ex2, []).
-test_words(ex3, []).
-test_words(ex4, []).
-test_words(ex5, []).
-test_words(ex6, []).
-test_words(ex7, []).
-test_words(ex8, []).
+test_words(ex2, [[], [x], [x, x, x]]).
+test_words(ex3, Words) :- test_words(ex2, Words).
+test_words(ex4, [[], [a, b], [a, c], [b], [c], [a, b, c]]).
+test_words(ex5, Words) :- test_words(ex4, Words).
+test_words(ex6, [[], [a], [b], [a, b], [b, a]]).
+test_words(ex7, [[], [a] ,[b], [a, y], [b, x], [a, y, x], [b, x, y, x]]).
+test_words(ex8, [[], [a]]).
 
-%grammar(ex_cykl, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
+%grammar(ex_cycle, [prod('A', [[nt('X'), nt('B'), nt('Y')]]), prod('B', [[nt('C')]]), prod('C', [['c'], [nt('A')]]), prod('X', [[]]), prod('Y', [[]])]).
 %grammar(ex_all, [prod('A', [[nt('A'), a], [nt('B'), a], [c]]), prod('B', [[nt('A'), b], [nt('B'), b], [c]])]).
 %grammar(ex_all_2, [
 %	prod('A', [[nt('B'), a, nt('X')], [c, nt('X')]]),
 %	prod('X', [[a, nt('X')], []]),
 %	prod('B', [[c, nt('X'), b, nt('Y')], [d, nt('Y')]]),
 %	prod('Y', [[a, nt('X'), b, nt('Y')], [b, nt('Y')], []])]).
-
 %grammar(ex1_mod, [prod('E', [[nt('T'), '+', nt('E')], [nt('T')]]), prod('T', [[id], ['(', nt('E'), ')']])]).
-%grammar(ex22, [prod('A', [[nt('A'), x], [x], [nt('A'), y], [y]])]).
 
 
 jestLL1(Gramatyka) :- is_LL1(Gramatyka).
@@ -520,7 +518,8 @@ all_left_recursion_fix_production(Grammar, [Result|ResultsRest], Before, NewResu
 % is_LL1(Grammar)
 is_LL1(Grammar) :-
 	select(Grammar, Select),
-	is_LL1_productions_ok(Select).
+	is_LL1_productions_ok(Select),
+	\+ direct_left_recursion_exists(Grammar).
 
 is_LL1_productions_ok([]).
 
