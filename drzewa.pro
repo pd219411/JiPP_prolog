@@ -611,12 +611,8 @@ possible_results(([Result|ResultsRest], [Select|SelectsRest]), TerminalOrNothing
 	possible_results((ResultsRest, SelectsRest), TerminalOrNothing, PossibleResultsRest).
 
 % matches_select(TerminalOrNothing, Select)
-matches_select([], []).
-
 matches_select([Terminal], Select) :-
 	member(Terminal, Select).
-
-
 
 
 % find_production_and_select(Grammar, Select, Nonterminal, ResultsAndSelect)
