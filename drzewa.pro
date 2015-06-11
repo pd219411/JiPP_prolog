@@ -197,6 +197,8 @@ test_firsts(Grammar, Firsts) :-
 	first(Grammar, FirstMap),
 	first_from_symbols(FirstMap, R, Firsts).
 
+eof_terminal('#').
+
 % follow(Grammar, Follow).
 follow(Grammar, Follow) :-
 	follow_map(Grammar, Map),
@@ -210,11 +212,12 @@ follow_map(Grammar, NewMap) :-
 	nonterminals_wrapped(Grammar, Keys),
 	map_from_set(Keys, [], Map),
 	start(Grammar, StartSymbol),
-	add_to_map_of_sets(Map, StartSymbol, [eof_0], NewMap).
+	eof_terminal(Eof),
+	add_to_map_of_sets(Map, StartSymbol, [Eof], NewMap).
 
 % follow_map_expand((Grammar, NormalizedGrammar, First), Map, MapExpanded).
 follow_map_expand((Grammar, NormalizedGrammar, First), Map, MapExpanded) :-
-	first_map_expand_step(NormalizedGrammar, Map, NewMap),
+	follow_map_expand_step((Grammar, NormalizedGrammar, First), Map, NewMap),
 	( Map == NewMap ->
 		Map = MapExpanded
 	;
